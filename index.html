@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>名刺手帖</title>
+<meta name="theme-color" content="#25493e">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f4ed;color:#253e36;font:16px/1.6 system-ui,sans-serif}main{max-width:660px;margin:auto;padding:24px 18px 110px}h1,h2{font-family:Georgia,"Yu Mincho",serif}h1{border-bottom:3px double #909c88;padding-bottom:12px}button,input,textarea,summary,.pick{font:inherit}button,.pick,summary{cursor:pointer}button,.pick{border:1px solid #a2afa3;background:#fffdf8;color:inherit;padding:9px 14px;border-radius:9px}.primary,.active{background:#25493e;color:white}input,textarea{width:100%;padding:10px;border:1px solid #a9b3aa;border-radius:7px;background:white}label,details{display:block;margin:10px 0}nav{position:fixed;bottom:0;left:0;right:0;background:#fffdf8;border-top:1px solid #bbb;padding:9px 6px max(9px,env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:center}nav button{font-size:14px;min-height:44px}nav button.primary{padding-inline:14px}.row{display:flex;width:100%;gap:12px;align-items:center;text-align:left;margin:8px 0}.row img{width:76px;height:48px;object-fit:contain}.row span{white-space:pre-line;overflow-wrap:anywhere}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;gap:2px}.grid button{padding:4px 0;min-height:58px}.grid small{display:block}.bar{display:flex;align-items:center;justify-content:space-between}fieldset{min-width:0}#preview{max-width:100%;max-height:40vh;display:block;margin:auto}fieldset{border:0;padding:0;margin:0}a{color:#235f4a;margin-right:12px}button:disabled{opacity:.5}[hidden]{display:none!important}
+</style></head><body><main><h1>名刺手帖</h1>
+<section id="browse"><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・ひとこと"></label><button id="manual">手入力で登録</button></div>
+<div id="calendar" hidden><div class="bar"><button id="prev" aria-label="前月">‹</button><h2 id="month"></h2><button id="next" aria-label="翌月">›</button></div><div id="grid" class="grid"></div></div><h2 id="heading"></h2><div id="list"></div>
+<details><summary>バックアップと復元</summary><p>写真と連絡先を含むJSONファイルです。会社指定の保存先で管理してください。</p><button id="backup">書き出す</button><label>バックアップを読み込む<input id="restore" type="file" accept=".json"></label></details></section>
+<form id="editor" hidden><fieldset id="fields"><h2 id="formTitle"></h2><img id="preview" alt="名刺写真" hidden><label>写真を選択・変更<input id="photo" type="file" accept="image/*"></label><label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label><label>写真からコピーした文字<textarea id="ocr"></textarea></label><button type="button" id="extract">電話・メールの空欄に反映</button></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="remove">削除</button></fieldset></form>
+<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav><button id="all">名刺一覧</button><button id="shoot" class="primary">＋ 名刺を撮る</button><button id="cal">カレンダー</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), form=$('editor'), field=k=>form.elements.namedItem(k);
+const keys=['person','memo','date','company','role','tel','mobile','address','email'];
+const pad=n=>String(n).padStart(2,'0');
+function localDate(d){return [d.getFullYear(),pad(d.getMonth()+1),pad(d.getDate())].join('-')}
+let selected=localDate(new Date()), mode='all', rows=[], draft,db, savePending=false;
+function message(s){$('notice').textContent=s;$('shootNext').hidden=s!=='保存しました。'}
+function openCamera(){
+ $('camera').value='';
+ $('camera').click();
+}
+function node(tag,s){const n=document.createElement(tag);n.textContent=s;return n}
+function transact(action){
+ return new Promise((resolve,reject)=>{const tx=db.transaction('cards','readwrite');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);action(tx.objectStore('cards'))})
+}
+async function refresh(){
+ rows=await new Promise((resolve,reject)=>{const r=db.transaction('cards').objectStore('cards').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+ draw()
+}
+const open=indexedDB.open('meishi-techo:'+location.pathname.replace(/index\.html$/,''),1);
+open.onupgradeneeded=()=>open.result.createObjectStore('cards',{keyPath:'id'});
+open.onsuccess=()=>{db=open.result;refresh().catch(()=>message('名刺を読み込めませんでした。'))};open.onerror=()=>message('端末内の保存領域を開けませんでした。');
+function draw(){
+ const cal=mode==='cal';$('calendar').hidden=!cal;$('searchBox').hidden=cal;
+ for(const id of ['all','cal'])$(id).classList.toggle('active',id===mode);
+ if(cal)drawCalendar();
+ const term=$('query').value.trim().toLowerCase();
+ const found=rows.filter(r=>cal?r.date===selected:[r.person,r.company,r.memo].join(' ').toLowerCase().includes(term)).sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
+ $('heading').textContent=(cal?selected:'名刺一覧')+' · '+found.length+'枚';$('list').replaceChildren();
+ if(!found.length)$('list').append(node('p',cal?'この日に受け取った名刺はありません。':term?'該当する名刺はありません。':'「名刺を撮る」から最初の1枚を登録できます。'));
+ for(const r of found){const b=node('button','');b.className='row';if(r.image){const im=new Image();im.loading='lazy';im.alt='';im.src=r.image;b.append(im)}b.append(node('span',[r.person||'氏名未入力',r.company,r.memo,r.date].filter(Boolean).join('\n')));b.onclick=()=>edit(r);$('list').append(b)}
+}
+function drawCalendar(){
+ const [y,m]=selected.split('-').map(Number), grid=$('grid');grid.replaceChildren();$('month').textContent=y+'年 '+m+'月';
+ for(const s of '日月火水木金土')grid.append(node('small',s));
+ for(let i=0;i<new Date(y,m-1,1).getDay();i++)grid.append(node('span',''));
+ const counts=new Map();for(const r of rows)counts.set(r.date,1+(counts.get(r.date)||0));
+ for(let d=1;d<=new Date(y,m,0).getDate();d++){const date=localDate(new Date(y,m-1,d)),b=node('button',d);if(counts.has(date))b.append(node('small',counts.get(date)+'枚'));if(date===selected)b.className='active';b.setAttribute('aria-pressed',date===selected);b.onclick=()=>{selected=date;draw()};grid.append(b)}
+}
+function shift(n){const [y,m]=selected.split('-').map(Number);selected=localDate(new Date(y,m-1+n,1));draw()}
+$('prev').onclick=()=>shift(-1);$('next').onclick=()=>shift(1);$('query').oninput=draw;
+function home(){form.hidden=true;$('browse').hidden=false;document.querySelector('nav').hidden=false;draw();scrollTo(0,0)}
+for(const id of ['all','cal'])$(id).onclick=()=>{mode=id;home();message('')};
+function preview(){const p=$('preview');p.hidden=!draft.image;if(draft.image)p.src=draft.image;else p.removeAttribute('src')}
+function edit(row){
+ draft=row?{...row}:{id:crypto.randomUUID(),created:Date.now(),date:localDate(new Date()),image:''};form.reset();for(const k of keys)field(k).value=draft[k]||'';
+ $('more').open=false;$('remove').hidden=!row;$('formTitle').textContent=row?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
+ for(const [value,label,url] of [[draft.tel,'代表に電話','tel:'],[draft.mobile,'直通に電話','tel:'],[draft.email,'メール','mailto:'],[draft.address,'地図','https://maps.apple.com/?q=']])if(value){const a=node('a',label);a.href=url+(url==='tel:'?value.replace(/[^\d+]/g,''):encodeURIComponent(value));$('actions').append(a)}
+ preview();$('browse').hidden=true;form.hidden=false;document.querySelector('nav').hidden=true;message('');scrollTo(0,0)
+}
+$('manual').onclick=()=>edit();$('cancel').onclick=home;$('shoot').onclick=openCamera;$('shootNext').onclick=openCamera;
+async function loadPhoto(file){
+ $('fields').disabled=true;const url=URL.createObjectURL(file);
+ try{const im=new Image();im.src=url;await im.decode();const ratio=Math.min(1,1800/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(im.width*ratio));cv.height=Math.max(1,Math.round(im.height*ratio));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);draft.image=cv.toDataURL('image/jpeg',.86);preview();message('')}
+ catch{message('画像を読み込めません。別の写真を選択してください。')}finally{URL.revokeObjectURL(url);$('fields').disabled=false}
+}
+$('camera').onchange=e=>{
+ const file=e.target.files[0];
+ if(!file)return;
+ if(savePending)return;
+ edit();
+ loadPhoto(file);
+};$('photo').onchange=e=>{if(e.target.files[0])loadPhoto(e.target.files[0])};
+$('extract').onclick=()=>{const s=$('ocr').value.normalize('NFKC');const t=s.match(/0\d{1,4}[-( ]?\d{1,4}[-) ]?\d{3,4}/),e=s.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);if(!field('tel').value&&t)field('tel').value=t[0];if(!field('email').value&&e)field('email').value=e[0];message('電話番号の種別と読み取り結果をご確認ください。')};
+async function commit(action,msg){
+ $('fields').disabled=true;
+ try{
+  await transact(action);
+  await refresh();
+  home();
+  message(msg);
+  return true;
+ }catch{
+  message('保存処理に失敗しました。空き容量をご確認ください。');
+  return false;
+ }finally{$('fields').disabled=false}
+}
+form.onsubmit=e=>{
+ e.preventDefault();
+ if(savePending)return;
+ for(const k of keys)draft[k]=field(k).value.trim();
+ if(!draft.image&&!keys.some(k=>k!=='date'&&draft[k])){
+  message('写真または名刺の情報を入力してください。');
+  return;
+ }
+ savePending=true;
+ commit(s=>s.put(draft),'保存しました。').finally(()=>{savePending=false});
+};
+$('remove').onclick=()=>{if(confirm('この名刺を削除しますか？'))commit(s=>s.delete(draft.id),'削除しました。')};
+$('backup').onclick=async()=>{await refresh();const file=new Blob([JSON.stringify({format:'meishi-1',cards:rows})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download='meishi-'+localDate(new Date())+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000)};
+$('restore').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const b=JSON.parse(await file.text());if(b.format!=='meishi-1'||!Array.isArray(b.cards)||!b.cards.every(r=>r&&typeof r.id==='string'&&r.id&&typeof r.created==='number'&&keys.every(k=>typeof r[k]==='string')&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&typeof r.image==='string'&&(!r.image||/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.image))))throw Error();if(confirm(b.cards.length+'枚を読み込みます。同じIDの名刺はバックアップの内容で更新しますか？')){await transact(s=>b.cards.forEach(r=>s.put(r)));await refresh();message('復元しました。')}}catch{message('復元できません。ファイルと空き容量をご確認ください。')}finally{e.target.value=''}};
+if('serviceWorker' in navigator && location.protocol==='https:'){
+ navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script></body></html>

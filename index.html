@@ -22,6 +22,12 @@ nav button.primary {padding-inline:2px}
 .choices {display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
 .choices legend {font-weight:600}
 #notice {color:#31574b;font-weight:600}
+.ocr-panel summary {font-weight:650}
+.ocr-row {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;margin:9px 0}
+.ocr-row label {min-width:0;margin:0;font-size:.9rem}
+.ocr-row select {display:block;margin-top:3px;text-overflow:ellipsis;min-height:44px}
+.ocr-row button {min-height:44px}
+#ocrFill {margin-top:6px}
 </style></head><body><main><h1>名刺手帖</h1>
 <section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・ひとこと"></label><button id="manual">手入力で登録</button></div>
 <div id="calendar" hidden><div class="bar"><button id="prev" aria-label="前月">‹</button><h2 id="month"></h2><button id="next" aria-label="翌月">›</button></div><div id="grid" class="grid"></div></div><h2 id="heading"></h2><div id="list"></div>
@@ -107,7 +113,19 @@ nav button.primary {padding-inline:2px}
   <div id="exportResult"></div>
  </form>
 </section>
-<form id="editor" hidden><fieldset id="fields"><h2 id="formTitle"></h2><img id="preview" alt="名刺写真" hidden><label>写真を選択・変更<input id="photo" type="file" accept="image/*"></label><label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label><label>写真からコピーした文字<textarea id="ocr"></textarea></label><button type="button" id="extract">電話・メールの空欄に反映</button></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="remove">削除</button></fieldset></form>
+<form id="editor" hidden><fieldset id="fields"><h2 id="formTitle"></h2><img id="preview" alt="名刺写真" hidden><label>写真を選択・変更<input id="photo" type="file" accept="image/*"></label><details id="ocrPanel" class="panel ocr-panel">
+ <summary>名刺から読み取ったテキストを貼り付ける</summary>
+ <p class="hint">iPhoneの「写真」などで名刺の文字をコピーし、下の欄に貼り付けます。</p>
+ <label>読み取ったテキスト<textarea id="ocr" rows="4" autocomplete="off" spellcheck="false" placeholder="ここに貼り付け"></textarea></label>
+ <div id="ocrResults" hidden>
+  <h3>入力候補</h3>
+  <p class="hint">候補を確認してから反映してください。複数ある項目は、欄を開くと別の候補を選べます。</p>
+  <div id="ocrFields"></div>
+  <button type="button" id="ocrFill" class="primary">空欄にまとめて反映</button>
+  <p id="ocrStatus" class="hint" role="status"></p>
+ </div>
+</details>
+<label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="remove">削除</button></fieldset></form>
 <p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav hidden><button id="all">名刺一覧</button><button id="shoot" class="primary">＋ 撮る</button><button id="cal">カレンダー</button><button id="share">共有・出力</button><button id="settingsTab">設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden>
 <script src="./storage.js?v=2"></script>
 <script src="./exports.js?v=2"></script>
@@ -171,7 +189,7 @@ for(const id of ['all','cal'])$(id).onclick=()=>{mode=id;home();message('')};
 function preview(){const p=$('preview');p.hidden=!draft.image;if(draft.image)p.src=draft.image;else p.removeAttribute('src')}
 function edit(row){
  draft=row?{...row}:{id:crypto.randomUUID(),created:Date.now(),date:localDate(new Date()),image:''};form.reset();for(const k of keys)field(k).value=draft[k]||'';
- $('more').open=false;$('remove').hidden=!row;$('shareCard').hidden=!row;$('formTitle').textContent=row?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
+ $('more').open=false;$('ocrPanel').open=false;$('remove').hidden=!row;$('shareCard').hidden=!row;$('formTitle').textContent=row?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
  for(const [value,label,url] of [[draft.tel,'代表に電話','tel:'],[draft.mobile,'直通に電話','tel:'],[draft.email,'メール','mailto:'],[draft.address,'地図','https://maps.apple.com/?q=']])if(value){const a=node('a',label);a.href=url+(url==='tel:'?value.replace(/[^\d+]/g,''):encodeURIComponent(value));$('actions').append(a)}
  preview();show('editor');message('')
 }
@@ -188,7 +206,6 @@ $('camera').onchange=e=>{
  edit();
  loadPhoto(file);
 };$('photo').onchange=e=>{if(e.target.files[0])loadPhoto(e.target.files[0])};
-$('extract').onclick=()=>{const s=$('ocr').value.normalize('NFKC');const t=s.match(/0\d{1,4}[-( ]?\d{1,4}[-) ]?\d{3,4}/),e=s.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);if(!field('tel').value&&t)field('tel').value=t[0];if(!field('email').value&&e)field('email').value=e[0];message('電話番号の種別と読み取り結果をご確認ください。')};
 async function commit(action,msg){
  $('fields').disabled=true;
  try{
@@ -227,5 +244,6 @@ if('serviceWorker' in navigator && window.isSecureContext){
  navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 </script>
+<script src="./card-text.js?v=3"></script>
 <script src="./screens.js?v=2"></script>
 </body></html>

@@ -22,6 +22,9 @@ nav button.primary {padding-inline:2px}
 .choices {display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
 .choices legend {font-weight:600}
 #notice {color:#31574b;font-weight:600}
+.photo-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+.photo-actions button {min-height:44px;padding-inline:6px;line-height:1.25}
+#photoPromptStatus {margin:0}
 .ocr-panel summary {font-weight:650}
 .ocr-row {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;margin:9px 0}
 .ocr-row label {min-width:0;margin:0;font-size:.9rem}
@@ -118,7 +121,33 @@ nav button.primary {padding-inline:2px}
   <div id="exportResult"></div>
  </form>
 </section>
-<form id="editor" hidden><fieldset id="fields"><h2 id="formTitle"></h2><img id="preview" alt="名刺写真" hidden><label>写真を選択・変更<input id="photo" type="file" accept="image/*"></label><details id="ocrPanel" class="panel ocr-panel">
+<form id="editor" hidden><fieldset id="fields"><h2 id="formTitle"></h2><img id="preview" alt="名刺写真" hidden>
+<div class="photo-actions">
+ <button id="choosePhoto" type="button">写真を選択・変更</button>
+ <button id="copyPhotoPrompt" type="button">プロンプトをコピー</button>
+</div>
+<input id="photo" type="file" accept="image/*" hidden>
+<p id="photoPromptStatus" class="hint" role="status"></p>
+<textarea id="photoPrompt" aria-label="Google フォト用プロンプト" rows="6" readonly hidden>この名刺写真から、読み取れる情報を下記の順番で出力してください。
+各項目は「項目名：値」の形式で1行にまとめ、氏名を最初の行にしてください。
+
+氏名：
+社名：
+部署・役職：
+住所：
+電話（代表）：
+直通：
+携帯：
+メール：
+
+・氏名は、姓と名の間に全角スペースを1つ入れてください（例：山田　太郎）。姓と名の区切りが不明な場合は、名刺の表記を保ってください。
+・社名は「株式会社」「（株）」なども含め、名刺の表記を保ってください。
+・支店名、担当部署名、役職は、名刺に記載があるものを「部署・役職」の1行にまとめてください。
+・住所は、郵便番号があれば「〒060-0001」の形式で行頭に置き、その後に住所を続けてください。住所が複数行に分かれていても、建物名や階数まで1行につなげてください。
+・電話番号は半角数字と半角ハイフンで表記してください（例：011-234-5678）。代表・直通・携帯は名刺の表記に従ってください。種別が不明な電話番号は「電話：」とし、FAX番号は省いてください。
+・メールアドレスは半角で、記載どおりに転記してください。
+・記載のない項目は行ごと省き、文字や数字を推測して補わないでください。前置き、箇条書き記号、説明文は加えず、項目の行だけを出力してください。</textarea>
+<details id="ocrPanel" class="panel ocr-panel">
  <summary>名刺から読み取ったテキストを貼り付ける</summary>
  <p id="ocrHelp" class="hint">写真アプリなどで名刺の文字をコピーし、下の欄に貼り付けます。</p>
  <label>読み取ったテキスト<textarea id="ocr" rows="4" autocomplete="off" spellcheck="false" placeholder="ここに貼り付け"></textarea></label>
@@ -151,6 +180,27 @@ function openPhotoPicker(id){
 }
 function openCamera(){openPhotoPicker('camera')}
 $('galleryButton').onclick = () => openPhotoPicker('gallery');
+$('choosePhoto').onclick = () => openPhotoPicker('photo');
+
+const photoPrompt = $('photoPrompt');
+const photoPromptStatus = $('photoPromptStatus');
+
+$('copyPhotoPrompt').onclick = async () => {
+ try {
+  await navigator.clipboard.writeText(photoPrompt.value);
+  photoPrompt.hidden = true;
+  photoPromptStatus.textContent = 'プロンプトをコピーしました。';
+ } catch {
+  photoPrompt.hidden = false;
+  photoPrompt.focus();
+  photoPrompt.select();
+  photoPromptStatus.textContent = '表示したプロンプトを選択してコピーしてください。';
+ }
+};
+form.addEventListener('reset', () => {
+ photoPrompt.hidden = true;
+ photoPromptStatus.textContent = '';
+});
 function node(tag,s){const n=document.createElement(tag);n.textContent=s;return n}
 async function readCards() {
  const state = await storage.read();

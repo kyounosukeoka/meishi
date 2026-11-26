@@ -4,7 +4,15 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f4ed;color:#253e36;font:16px/1.6 system-ui,sans-serif}main{max-width:660px;margin:auto;padding:24px 18px 110px}h1,h2{font-family:Georgia,"Yu Mincho",serif}h1{border-bottom:3px double #909c88;padding-bottom:12px}button,input,textarea,summary,.pick{font:inherit}button,.pick,summary{cursor:pointer}button,.pick{border:1px solid #a2afa3;background:#fffdf8;color:inherit;padding:9px 14px;border-radius:9px}.primary,.active{background:#25493e;color:white}input,textarea,select{font:inherit;width:100%;padding:10px;border:1px solid #a9b3aa;border-radius:7px;background:white}label,details{display:block;margin:10px 0}nav{position:fixed;bottom:0;left:0;right:0;background:#fffdf8;border-top:1px solid #bbb;padding:9px 6px max(9px,env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:center}nav button{font-size:14px;min-height:44px}nav button.primary{padding-inline:14px}.row{display:flex;width:100%;gap:12px;align-items:center;text-align:left;margin:8px 0}.row img{width:76px;height:48px;object-fit:contain}.row span{white-space:pre-line;overflow-wrap:anywhere}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;gap:2px}.grid button{padding:4px 0;min-height:58px}.grid small{display:block}.bar{display:flex;align-items:center;justify-content:space-between}fieldset{min-width:0}#preview{max-width:100%;max-height:40vh;display:block;margin:auto}fieldset{border:0;padding:0;margin:0}a{color:#235f4a;margin-right:12px}button:disabled{opacity:.5}[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:#f7f4ed;color:#253e36;font:16px/1.6 system-ui,sans-serif}main{max-width:660px;margin:auto;padding:24px 18px 110px}h1,h2{font-family:Georgia,"Yu Mincho",serif}h1{border-bottom:3px double #909c88;padding-bottom:12px}button,input,textarea,summary,.pick{font:inherit}button,.pick,summary{cursor:pointer}button,.pick{border:1px solid #a2afa3;background:#fffdf8;color:inherit;padding:9px 14px;border-radius:9px}.primary,.active{background:#25493e;color:white}input,textarea,select{font:inherit;width:100%;padding:10px;border:1px solid #a9b3aa;border-radius:7px;background:white}label,details{display:block;margin:10px 0}nav{position:fixed;bottom:0;left:0;right:0;background:#fffdf8;border-top:1px solid #bbb;padding:9px 6px max(9px,env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:center}nav button{font-size:14px;min-height:44px}nav button.primary{padding-inline:14px}.row{display:grid;grid-template-columns:76px minmax(0,1fr);width:100%;gap:12px;align-items:start;text-align:left;margin:8px 0}
+.row-photo{width:76px;height:48px;display:grid;grid-template:100% / 100%;place-items:center;background:#f5f3ec;border-radius:5px;overflow:hidden}
+.row-photo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center top}
+.row-photo small{font-size:.75rem;color:#456158}
+.row-details{min-width:0;white-space:pre-line;overflow-wrap:anywhere}
+.list-controls{display:flex;align-items:end;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.list-controls button{min-height:44px}
+.list-controls label{display:grid;gap:3px;margin:0;font-size:.875rem}
+.list-controls select{min-height:44px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;gap:2px}.grid button{padding:4px 0;min-height:58px}.grid small{display:block}.bar{display:flex;align-items:center;justify-content:space-between}fieldset{min-width:0}#preview{max-width:100%;max-height:40vh;display:block;margin:auto}fieldset{border:0;padding:0;margin:0}a{color:#235f4a;margin-right:12px}button:disabled{opacity:.5}[hidden]{display:none!important}
 
 nav {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;max-width:660px;margin:auto}
 nav button {font-size:clamp(10px,3vw,14px);padding:5px 2px;white-space:normal;border-radius:7px}
@@ -32,7 +40,15 @@ nav button.primary {padding-inline:2px}
 .ocr-row button {min-height:44px}
 #ocrFill {margin-top:6px}
 </style></head><body><main><h1>名刺手帖</h1>
-<section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・メモ・電話の下4桁"></label><div class="buttons"><button id="galleryButton">写真を選んで登録</button><button id="manual">手入力で登録</button></div></div>
+<section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・メモ・電話の下4桁"></label>
+<div class="list-controls">
+ <button id="showAllCards" type="button">全件表示</button>
+ <label>受け取った日<select id="dateOrder">
+  <option value="newest">新しい順</option>
+  <option value="oldest">古い順</option>
+ </select></label>
+</div>
+<div class="buttons"><button id="galleryButton">写真を選んで登録</button><button id="manual">手入力で登録</button></div></div>
 <div id="calendar" hidden><div class="bar"><button id="prev" aria-label="前月">‹</button><h2 id="month"></h2><button id="next" aria-label="翌月">›</button></div><div id="grid" class="grid"></div></div><h2 id="heading"></h2><div id="list"></div>
 </section>
 <section id="locked" class="panel" hidden>
@@ -241,11 +257,12 @@ function draw(){
 
  const term=$('query').value.trim().toLowerCase();
  const number=cal ? '' : phoneQuery(term.normalize('NFKC'));
+ const dateDirection=(!cal && $('dateOrder').value==='oldest') ? 1 : -1;
  const found=rows.filter(card=>{
   if(cal)return card.date===selected;
   if(number)return matchingNumbers(card,number).length>0;
   return [card.person,card.company,card.memo].join(' ').toLowerCase().includes(term);
- }).sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
+ }).sort((a,b)=>dateDirection*(a.date.localeCompare(b.date)||a.created-b.created));
 
  $('heading').textContent=(cal?selected:'名刺一覧')+' · '+found.length+'枚';
  $('list').replaceChildren();
@@ -256,15 +273,22 @@ function draw(){
  for(const card of found){
   const button=node('button','');
   button.className='row';
+  const photo=node('span','');
+  photo.className='row-photo';
+  photo.setAttribute('aria-hidden','true');
   if(card.image){
    const image=new Image();
    image.loading='lazy';
    image.alt='';
    image.src=card.image;
-   button.append(image);
+   photo.append(image);
+  }else{
+   photo.append(node('small','写真なし'));
   }
   const phones=cal ? [] : matchingNumbers(card,number).map(([label,value])=>label+' '+value);
-  button.append(node('span',[card.person||'氏名未入力',card.company,...phones,card.memo,card.date].filter(Boolean).join('\n')));
+  const details=node('span',[card.person||'氏名未入力',card.company,...phones,card.memo,card.date].filter(Boolean).join('\n'));
+  details.className='row-details';
+  button.append(photo,details);
   button.onclick=()=>edit(card);
   $('list').append(button);
  }
@@ -278,6 +302,11 @@ function drawCalendar(){
 }
 function shift(n){const [y,m]=selected.split('-').map(Number);selected=localDate(new Date(y,m-1+n,1));draw()}
 $('prev').onclick=()=>shift(-1);$('next').onclick=()=>shift(1);$('query').oninput=draw;
+$('dateOrder').onchange=draw;
+$('showAllCards').onclick=()=>{
+ $('query').value='';
+ draw();
+};
 function show(screen) {
  for (const id of ['browse', 'editor', 'settings', 'exports', 'locked']) {
   $(id).hidden = id !== screen;

@@ -42,6 +42,9 @@ textarea {resize:vertical}
 .photo-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
 .photo-actions button {min-height:44px;padding-inline:6px;line-height:1.25}
 #photoPromptStatus {margin:0}
+.name-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.name-fields label {min-width:0}
+#unparsedName {margin-top:0}
 .ocr-panel summary {font-weight:650}
 .ocr-row {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;margin:9px 0}
 .ocr-row label {min-width:0;margin:0;font-size:.9rem}
@@ -71,7 +74,7 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.1.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.2.0</strong></div>
  </section>
  <section id="androidSetup" class="panel" hidden>
   <h3>ホーム画面から開く</h3>
@@ -157,9 +160,10 @@ textarea {resize:vertical}
 <input id="photo" type="file" accept="image/*" hidden>
 <p id="photoPromptStatus" class="hint" role="status"></p>
 <textarea id="photoPrompt" aria-label="Google フォト用プロンプト" rows="6" readonly hidden>この名刺写真から、読み取れる情報を下記の順番で出力してください。
-各項目は「項目名：値」の形式で1行にまとめ、氏名を最初の行にしてください。
+各項目は「項目名：値」の形式で1行にまとめ、姓と名を最初に出力してください。
 
-氏名：
+姓：
+名：
 社名：
 部署・役職：
 住所：
@@ -168,7 +172,7 @@ textarea {resize:vertical}
 携帯：
 メール：
 
-・氏名は、姓と名の間に全角スペースを1つ入れてください（例：山田　太郎）。姓と名の区切りが不明な場合は、名刺の表記を保ってください。
+・姓（苗字）と名（下の名前）は別々の行にしてください（例：姓：山田、名：太郎）。ローマ字の氏名も、名前の並びだけで判断せず、区別できるときだけ分けてください。区切りが不明な場合は「氏名（区切り不明）：」の1行に名刺の表記をそのまま出力してください。
 ・社名は「株式会社」「（株）」なども含め、名刺の表記を保ってください。
 ・支店名、担当部署名、役職は、名刺に記載があるものを「部署・役職」の1行にまとめてください。
 ・住所は、郵便番号があれば「〒060-0001」の形式で行頭に置き、その後に住所を続けてください。住所が複数行に分かれていても、建物名や階数まで1行につなげてください。
@@ -187,16 +191,24 @@ textarea {resize:vertical}
   <p id="ocrStatus" class="hint" role="status"></p>
  </div>
 </details>
-<label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
+<div class="name-fields">
+ <label>姓（苗字）<input name="familyName" autocomplete="off"></label>
+ <label>名（下の名前）<input name="givenName" autocomplete="off"></label>
+</div>
+<label id="unparsedName" hidden>氏名（区切り不明）<input name="person" autocomplete="off">
+ <span class="hint">姓・名を入力すると、その内容で保存します。</span>
+</label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
 <p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="share" disabled>共有・出力</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
 <script src="./storage.js?v=2"></script>
-<script src="./exports.js?v=8"></script>
+<script src="./exports.js?v=12"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id), form=$('editor'), field=k=>form.elements.namedItem(k);
 const isAndroid = /Android/i.test(navigator.userAgent);
 const mapSearch = 'https://www.google.com/maps/search/?api=1&query=';
 const keys=['person','memo','date','company','role','tel','mobile','address','email'];
+const nameKeys=['familyName','givenName'];
+const editorKeys=[...keys,...nameKeys];
 const pad=n=>String(n).padStart(2,'0');
 function localDate(d){return [d.getFullYear(),pad(d.getMonth()+1),pad(d.getDate())].join('-')}
 let selected=localDate(new Date()), mode='all', rows=[], draft, editorBusy=false, appLock=null, appKey=null;
@@ -273,7 +285,8 @@ function draw(){
  const found=rows.filter(card=>{
   if(cal)return card.date===selected;
   if(number)return matchingNumbers(card,number).length>0;
-  return [card.person,card.company,card.memo].join(' ').toLowerCase().includes(term);
+  return [card.person,card.company,card.memo].join(' ').toLowerCase().includes(term) ||
+   (card.person || '').toLowerCase().replace(/\s+/gu,'').includes(term.replace(/\s+/gu,''));
  }).sort((a,b)=>dateDirection*(a.date.localeCompare(b.date)||a.created-b.created));
 
  $('heading').textContent=(cal?selected:'名刺一覧')+' · '+found.length+'枚';
@@ -341,7 +354,7 @@ function pageState() {
  if (currentScreen === 'editor') {
   state.draft = draft;
   state.saved = !$('remove').hidden;
-  state.fields = keys.map(key => field(key).value);
+  state.fields = editorKeys.map(key => field(key).value);
   state.ocr = $('ocr').value;
   state.ocrOpen = $('ocrPanel').open;
   state.moreOpen = $('more').open;
@@ -376,7 +389,8 @@ function goBack() {
  const previous = pageHistory.pop();
  if (previous.screen === 'editor') {
   populateEditor(previous.draft, previous.saved);
-  keys.forEach((key, index) => {field(key).value = previous.fields[index]});
+  editorKeys.forEach((key, index) => {field(key).value = previous.fields[index]});
+  updateUnparsedName();
   $('ocr').value = previous.ocr;
   $('ocrPanel').open = previous.ocrOpen;
   $('more').open = previous.moreOpen;
@@ -395,10 +409,18 @@ function edit(row) {
  populateEditor(record, Boolean(row));
  message('');
 }
+function updateUnparsedName() {
+ $('unparsedName').hidden = !field('person').value.trim();
+}
 function populateEditor(record, saved) {
  draft={...record};
  form.reset();
  for(const key of keys)field(key).value=draft[key]||'';
+ const {familyName,givenName,unparsedName}=output.nameParts(draft);
+ field('familyName').value=familyName;
+ field('givenName').value=givenName;
+ field('person').value=unparsedName;
+ updateUnparsedName();
  $('more').open=false;$('ocrPanel').open=false;$('remove').hidden=!saved;$('shareCard').hidden=!saved;$('exportContact').hidden=!saved;$('formTitle').textContent=saved?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
  for(const [value,label,url] of [[draft.tel,'代表に電話','tel:'],[draft.mobile,'直通に電話','tel:'],[draft.email,'メール','mailto:'],[draft.address,'地図',mapSearch]])if(value){const a=node('a',label);a.href=url+(url==='tel:'?value.replace(/[^\d+]/g,''):encodeURIComponent(value));$('actions').append(a)}
  preview();
@@ -444,7 +466,8 @@ form.onsubmit=e=>{
  e.preventDefault();
  if(editorBusy)return;
  const card = {...draft};
- for(const key of keys)card[key]=field(key).value.trim();
+ for(const key of editorKeys)card[key]=field(key).value.trim();
+ card.person = [card.familyName,card.givenName].filter(Boolean).join('　') || card.person;
  if(!card.image&&!keys.some(key=>key!=='date'&&card[key])){
   message('写真または名刺の情報を入力してください。');
   return;
@@ -493,6 +516,6 @@ if('serviceWorker' in navigator && window.isSecureContext){
  navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 </script>
-<script src="./card-text.js?v=5"></script>
-<script src="./screens.js?v=8"></script>
+<script src="./card-text.js?v=12"></script>
+<script src="./screens.js?v=12"></script>
 </body></html>

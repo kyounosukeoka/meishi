@@ -205,9 +205,11 @@ function validatedCards(payload) {
   if (!card || typeof card.id !== 'string' || !card.id || !Number.isFinite(card.created) ||
       !/^\d{4}-\d{2}-\d{2}$/u.test(card.date) || typeof card.image !== 'string' ||
       (card.image && !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/u.test(card.image)) ||
-      !keys.every(key => typeof card[key] === 'string')) throw new Error();
+      !keys.every(key => typeof card[key] === 'string') ||
+      nameKeys.some(key => key in card && typeof card[key] !== 'string')) throw new Error();
   return {id: card.id, created: card.created, image: card.image,
-   ...Object.fromEntries(keys.map(key => [key, card[key]]))};
+   ...Object.fromEntries(keys.map(key => [key, card[key]])),
+   ...Object.fromEntries(nameKeys.filter(key => key in card).map(key => [key, card[key]]))};
  });
 }
 

@@ -208,6 +208,23 @@ const output = (() => {
   return head;
  }
 
+ function nameParts(card) {
+  const person = String(card.person ?? '').trim();
+  if (typeof card.familyName === 'string' || typeof card.givenName === 'string') {
+   const familyName = String(card.familyName ?? '').trim();
+   const givenName = String(card.givenName ?? '').trim();
+   return {familyName, givenName, unparsedName: familyName || givenName ? '' : person};
+  }
+
+  // Older cards stored only the display name. Keep the existing Japanese-name convention.
+  const parts = person.split(/\s+/u);
+  const japaneseName = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(person);
+  if (japaneseName && parts.length === 2) {
+   return {familyName: parts[0], givenName: parts[1], unparsedName: ''};
+  }
+  return {familyName: '', givenName: '', unparsedName: person};
+ }
+
  function contactFile(card) {
   const {person, company, role, tel, mobile, address, email} = Object.fromEntries(
    ['person', 'company', 'role', 'tel', 'mobile', 'address', 'email']
@@ -216,13 +233,10 @@ const output = (() => {
   const name = person || company || tel || mobile || email || address || role;
   if (!name) return null;
 
-  // Separate an explicitly spaced Japanese name into family and given names.
-  const nameParts = person.split(/\s+/u);
-  const japaneseName = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(person);
-  const [family, given] = japaneseName && nameParts.length === 2 ? nameParts : ['', person];
+  const {familyName, givenName, unparsedName} = nameParts(card);
   const escape = escapeContactText;
   const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + escape(name),
-   'N:' + [family, given, '', '', ''].map(escape).join(';')];
+   'N:' + [familyName, givenName || unparsedName, '', '', ''].map(escape).join(';')];
   if (company) lines.push('ORG:' + escape(company));
   if (role) lines.push('TITLE:' + escape(role));
   if (tel) lines.push('TEL;TYPE=WORK,VOICE:' + escape(tel.normalize('NFKC')));
@@ -247,5 +261,5 @@ const output = (() => {
   return new File([content], (safeName || '名刺手帖') + '.vcf', {type: 'text/vcard;charset=utf-8'});
  }
 
- return {columns, width, csv, createFiles, contactFile};
+ return {columns, width, csv, createFiles, contactFile, nameParts};
 })();

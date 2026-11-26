@@ -18,11 +18,24 @@ function extractCardCandidates(text) {
  const urlLine = /(?:https?:\/\/|www\.|\bURL\b)/iu;
 
  const phonePattern = /(?<![\dA-Za-z@])(?:\+81[ \t-]*(?:\(0\)[ \t-]*)?(?:\(\d{1,4}\)[ \t-]*|\d{1,4}[ \t-]+)\d{1,4}[ \t-]+\d{3,4}|(?:\(0\d{1,4}\)[ \t-]*|0\d{1,4}[ \t-]+)\d{1,4}[ \t-]+\d{3,4}|0\d{1,4}[ \t]*\(\d{1,4}\)[ \t-]*\d{3,4}|\+81[ \t-]*(?:\(0\)[ \t-]*)?\d{9,10}|0\d{9,10})(?!\d)/gu;
- const found = {company: [], person: [], role: [], address: [], email: [], tel: [], mobile: []};
+ const found = {company: [], person: [], familyName: [], givenName: [], role: [], address: [], email: [], tel: [], mobile: []};
+ const unsplitNames = new Set();
+ const namePartLabel = /^(?:(姓|苗字|名字|family name|last name|surname)|(名|下の名前|given name|first name)|氏名\s*\(区切り不明\))\s*:/iu;
  const occupied = new Set();
 
  for (const [index, line] of lines.entries()) {
   const value = line.value;
+  const namePart = value.match(namePartLabel);
+  if (namePart) {
+   const valueAsPrinted = line.original.replace(/^[^:：]+[:：]\s*/u,'').trim();
+   if (valueAsPrinted) {
+    if (namePart[1]) found.familyName.push(valueAsPrinted);
+    else if (namePart[2]) found.givenName.push(valueAsPrinted);
+    else unsplitNames.add(valueAsPrinted);
+   }
+   occupied.add(index);
+   continue;
+  }
   const emails = (value.match(emailPattern) || []).filter(email => !email.includes('..'));
   found.email.push(...emails);
   if (emails.length || urlLine.test(value) || contactLabel.test(value)) occupied.add(index);
@@ -109,19 +122,22 @@ function extractCardCandidates(text) {
   const latin = /^[\p{Script=Latin}]+(?:[.'’\-][\p{Script=Latin}]+)*\.?(?:\s+[\p{Script=Latin}]+(?:[.'’\-][\p{Script=Latin}]+)*\.?){1,3}$/u.test(line.value);
   if (japanese || latin) inferredNames.push(line.original);
  }
- found.person = [...labeledNames, ...inferredNames.slice(0, 3)];
+ const inferred = found.familyName.length || found.givenName.length || unsplitNames.size ? [] : inferredNames.slice(0, 3);
+ found.person = [...unsplitNames, ...labeledNames, ...inferred];
  for (const key of Object.keys(found)) found[key] = unique(found[key]);
- return found;
+ return {...found, unsplitNames};
 }
 
 const ocrFields = [
- ['company', '社名'], ['person', '氏名'], ['role', '部署・役職'], ['address', '住所'],
+ ['company', '社名'], ['familyName', '姓（苗字）'], ['givenName', '名（下の名前）'],
+ ['person', '氏名（まとめて）'], ['role', '部署・役職'], ['address', '住所'],
  ['email', 'メールアドレス'], ['tel', '電話番号（代表・種別不明）'], ['mobile', '直通・携帯'],
 ];
 const ocrInput = $('ocr');
 const ocrResults = $('ocrResults');
 const ocrStatus = $('ocrStatus');
 const ocrOptions = new Map();
+let unsplitNameCandidates = new Set();
 
 for (const [key, label] of ocrFields) {
  const row = node('div', '');
@@ -143,13 +159,24 @@ for (const [key, label] of ocrFields) {
 }
 
 function reflectOcrField(key, value) {
+ if (key === 'person') {
+  const name = unsplitNameCandidates.has(value)
+   ? {familyName:'',givenName:'',unparsedName:value}
+   : output.nameParts({person:value});
+  field('familyName').value = name.familyName;
+  field('givenName').value = name.givenName;
+  field('person').value = name.unparsedName;
+  updateUnparsedName();
+  return;
+ }
  field(key).value = value;
- if (key !== 'person') $('more').open = true;
+ if (!nameKeys.includes(key)) $('more').open = true;
 }
 
 function showOcrCandidates() {
  const hasText = Boolean(ocrInput.value.trim());
  const found = extractCardCandidates(ocrInput.value);
+ unsplitNameCandidates = found.unsplitNames;
  let count = 0;
  for (const [key, {select, button}] of ocrOptions) {
   const values = found[key];
@@ -170,6 +197,8 @@ $('ocrFill').onclick = () => {
  let filled = 0;
  for (const [key, {select}] of ocrOptions) {
   if (!select.value || field(key).value.trim()) continue;
+  if (key === 'person' && nameKeys.some(nameKey => field(nameKey).value.trim())) continue;
+  if (nameKeys.includes(key) && field('person').value.trim()) continue;
   reflectOcrField(key, select.value);
   filled++;
  }

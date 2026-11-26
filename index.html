@@ -191,7 +191,7 @@ textarea {resize:vertical}
 'use strict';
 const $=id=>document.getElementById(id), form=$('editor'), field=k=>form.elements.namedItem(k);
 const isAndroid = /Android/i.test(navigator.userAgent);
-const mapSearch = isAndroid ? 'https://www.google.com/maps/search/?api=1&query=' : 'https://maps.apple.com/?q=';
+const mapSearch = 'https://www.google.com/maps/search/?api=1&query=';
 const keys=['person','memo','date','company','role','tel','mobile','address','email'];
 const pad=n=>String(n).padStart(2,'0');
 function localDate(d){return [d.getFullYear(),pad(d.getMonth()+1),pad(d.getDate())].join('-')}

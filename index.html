@@ -29,7 +29,7 @@ nav button.primary {padding-inline:2px}
 .ocr-row button {min-height:44px}
 #ocrFill {margin-top:6px}
 </style></head><body><main><h1>名刺手帖</h1>
-<section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・ひとこと"></label><div class="buttons"><button id="galleryButton">写真を選んで登録</button><button id="manual">手入力で登録</button></div></div>
+<section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・メモ・電話の下4桁"></label><div class="buttons"><button id="galleryButton">写真を選んで登録</button><button id="manual">手入力で登録</button></div></div>
 <div id="calendar" hidden><div class="bar"><button id="prev" aria-label="前月">‹</button><h2 id="month"></h2><button id="next" aria-label="翌月">›</button></div><div id="grid" class="grid"></div></div><h2 id="heading"></h2><div id="list"></div>
 </section>
 <section id="locked" class="panel" hidden>
@@ -164,15 +164,60 @@ async function refresh() {
  rows = await readCards();
  draw();
 }
+function phoneDigits(phone) {
+ const normalized = String(phone ?? '').normalize('NFKC')
+  .replace(/\s*\(?(?:内線|ext(?:ension)?\.?|x|#)\s*[:.]?\s*\d+\)?\s*$/iu, '');
+ // Let a domestic number and the same Japanese number in +81 format match.
+ return normalized.replace(/^\+81[\s\-‐‑–—―−]*(?:\(0\))?/u, '0').replace(/\D/gu, '');
+}
+function phoneQuery(term) {
+ if (!/^\+?[\d\s().\-‐‑–—―−ー]+$/u.test(term)) return '';
+ const digits = phoneDigits(term);
+ return digits.length === 4 || digits.length >= 7 ? digits : '';
+}
+function matchingNumbers(card, query) {
+ return [['電話', card.tel], ['直通・携帯', card.mobile]].filter(([, phone]) => {
+  if (!phone) return false;
+  if (!query) return true;
+  const digits = phoneDigits(phone);
+  return digits.length >= 4 && (query.length === 4 ? digits.endsWith(query) : digits === query);
+ });
+}
 function draw(){
- const cal=mode==='cal';$('calendar').hidden=!cal;$('searchBox').hidden=cal;
- 
+ const cal=mode==='cal';
+ $('calendar').hidden=!cal;
+ $('searchBox').hidden=cal;
  if(cal)drawCalendar();
+
  const term=$('query').value.trim().toLowerCase();
- const found=rows.filter(r=>cal?r.date===selected:[r.person,r.company,r.memo].join(' ').toLowerCase().includes(term)).sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
- $('heading').textContent=(cal?selected:'名刺一覧')+' · '+found.length+'枚';$('list').replaceChildren();
- if(!found.length)$('list').append(node('p',cal?'この日に受け取った名刺はありません。':term?'該当する名刺はありません。':'「名刺を撮る」から最初の1枚を登録できます。'));
- for(const r of found){const b=node('button','');b.className='row';if(r.image){const im=new Image();im.loading='lazy';im.alt='';im.src=r.image;b.append(im)}b.append(node('span',[r.person||'氏名未入力',r.company,r.memo,r.date].filter(Boolean).join('\n')));b.onclick=()=>edit(r);$('list').append(b)}
+ const number=cal ? '' : phoneQuery(term.normalize('NFKC'));
+ const found=rows.filter(card=>{
+  if(cal)return card.date===selected;
+  if(number)return matchingNumbers(card,number).length>0;
+  return [card.person,card.company,card.memo].join(' ').toLowerCase().includes(term);
+ }).sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
+
+ $('heading').textContent=(cal?selected:'名刺一覧')+' · '+found.length+'枚';
+ $('list').replaceChildren();
+ if(!found.length){
+  const empty=cal?'この日に受け取った名刺はありません。':term?'該当する名刺はありません。':'「名刺を撮る」から最初の1枚を登録できます。';
+  $('list').append(node('p',empty));
+ }
+ for(const card of found){
+  const button=node('button','');
+  button.className='row';
+  if(card.image){
+   const image=new Image();
+   image.loading='lazy';
+   image.alt='';
+   image.src=card.image;
+   button.append(image);
+  }
+  const phones=cal ? [] : matchingNumbers(card,number).map(([label,value])=>label+' '+value);
+  button.append(node('span',[card.person||'氏名未入力',card.company,...phones,card.memo,card.date].filter(Boolean).join('\n')));
+  button.onclick=()=>edit(card);
+  $('list').append(button);
+ }
 }
 function drawCalendar(){
  const [y,m]=selected.split('-').map(Number), grid=$('grid');grid.replaceChildren();$('month').textContent=y+'年 '+m+'月';
@@ -285,6 +330,6 @@ if('serviceWorker' in navigator && window.isSecureContext){
  navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 </script>
-<script src="./card-text.js?v=3"></script>
+<script src="./card-text.js?v=5"></script>
 <script src="./screens.js?v=2"></script>
 </body></html>

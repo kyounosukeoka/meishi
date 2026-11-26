@@ -18,7 +18,7 @@ function extractCardCandidates(text) {
  const urlLine = /(?:https?:\/\/|www\.|\bURL\b)/iu;
 
  const phonePattern = /(?<![\dA-Za-z@])(?:\+81[ \t-]*(?:\(0\)[ \t-]*)?(?:\(\d{1,4}\)[ \t-]*|\d{1,4}[ \t-]+)\d{1,4}[ \t-]+\d{3,4}|(?:\(0\d{1,4}\)[ \t-]*|0\d{1,4}[ \t-]+)\d{1,4}[ \t-]+\d{3,4}|0\d{1,4}[ \t]*\(\d{1,4}\)[ \t-]*\d{3,4}|\+81[ \t-]*(?:\(0\)[ \t-]*)?\d{9,10}|0\d{9,10})(?!\d)/gu;
- const found = {company: [], person: [], address: [], email: [], tel: [], mobile: []};
+ const found = {company: [], person: [], role: [], address: [], email: [], tel: [], mobile: []};
  const occupied = new Set();
 
  for (const [index, line] of lines.entries()) {
@@ -49,9 +49,16 @@ function extractCardCandidates(text) {
    const mobile = /携帯|直通|mobile/iu.test(label) || /^(?:050|060|070|080|090)\d{8}$/u.test(domestic);
    found[mobile ? 'mobile' : 'tel'].push(number);
   }
-  if (corporate.test(value) && !emails.length && !urlLine.test(value) && !contactLabel.test(value)) {
-   const company = line.original.replace(/^(?:社名|会社名)\s*[:：]\s*/u, '').trim();
-   if (!/^(?:社名|会社名|会社)$/u.test(company)) found.company.push(company);
+  const role = line.original.match(/^(?:担当部署(?:・役職)?|部署(?:・役職)?|役職)\s*[:：]\s*(.+)$/u);
+  if (role) {
+   found.role.push(role[1].trim());
+   occupied.add(index);
+   continue;
+  }
+  const companyLabel = /^(?:社名|会社名)\s*[:：]\s*/u;
+  if (companyLabel.test(value) || (corporate.test(value) && !emails.length && !urlLine.test(value) && !contactLabel.test(value))) {
+   const company = line.original.replace(companyLabel, '').trim();
+   if (company && !/^(?:社名|会社名|会社)$/u.test(company)) found.company.push(company);
    occupied.add(index);
   }
  }
@@ -68,7 +75,7 @@ function extractCardCandidates(text) {
   if (occupied.has(index)) continue;
   const zip = line.value.match(zipPattern);
   const textWithoutLabel = line.value.replace(/^住所\s*[:：]\s*/u, '');
-  if (!zip && !textWithoutLabel.startsWith('〒') &&
+  if (!zip && !/^住所\s*[:：]/u.test(line.value) && !textWithoutLabel.startsWith('〒') &&
       !(locality.test(textWithoutLabel) && (locationDetail.test(textWithoutLabel) ||
        addressContinuation(lines[index + 1], false, false)))) continue;
   const firstPart = zip ? line.value.slice(zip[0].length).trim() : textWithoutLabel.replace(/^〒\s*/u, '');
@@ -108,7 +115,7 @@ function extractCardCandidates(text) {
 }
 
 const ocrFields = [
- ['company', '社名'], ['person', '氏名'], ['address', '住所'],
+ ['company', '社名'], ['person', '氏名'], ['role', '部署・役職'], ['address', '住所'],
  ['email', 'メールアドレス'], ['tel', '電話番号（代表・種別不明）'], ['mobile', '直通・携帯'],
 ];
 const ocrInput = $('ocr');

@@ -4,7 +4,11 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f4ed;color:#253e36;font:16px/1.6 system-ui,sans-serif}main{max-width:660px;margin:auto;padding:24px 18px 110px}h1,h2{font-family:Georgia,"Yu Mincho",serif}h1{border-bottom:3px double #909c88;padding-bottom:12px}button,input,textarea,summary,.pick{font:inherit}button,.pick,summary{cursor:pointer}button,.pick{border:1px solid #a2afa3;background:#fffdf8;color:inherit;padding:9px 14px;border-radius:9px}.primary,.active{background:#25493e;color:white}input,textarea,select{font:inherit;width:100%;padding:10px;border:1px solid #a9b3aa;border-radius:7px;background:white}label,details{display:block;margin:10px 0}nav{position:fixed;bottom:0;left:0;right:0;background:#fffdf8;border-top:1px solid #bbb;padding:9px 6px max(9px,env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:center}nav button{font-size:14px;min-height:44px}nav button.primary{padding-inline:14px}.row{display:grid;grid-template-columns:76px minmax(0,1fr);width:100%;gap:12px;align-items:start;text-align:left;margin:8px 0}
+*{box-sizing:border-box}body{margin:0;background:#f7f4ed;color:#253e36;font:16px/1.6 system-ui,sans-serif}html,body{max-width:100%;overflow-x:hidden;overflow-x:clip;overscroll-behavior-x:none}
+body{touch-action:pan-y pinch-zoom;overflow-wrap:anywhere}
+main{width:100%;max-width:660px;margin:auto;padding:24px 18px calc(104px + env(safe-area-inset-bottom))}h1,h2{font-family:Georgia,"Yu Mincho",serif}.app-header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:3px double #909c88;margin:0 0 20px;padding-bottom:12px}
+.app-header h1{margin:0;min-width:0}
+.app-header button{flex:none;min-height:44px}button,input,textarea,summary,.pick{font:inherit}button,.pick,summary{cursor:pointer}button,.pick{border:1px solid #a2afa3;background:#fffdf8;color:inherit;padding:9px 14px;border-radius:9px}.primary,.active{background:#25493e;color:white}input,textarea,select{font:inherit;width:100%;padding:10px;border:1px solid #a9b3aa;border-radius:7px;background:white}label,details{display:block;margin:10px 0}nav{position:fixed;bottom:0;left:0;right:0;background:#fffdf8;border-top:1px solid #bbb;padding:9px 6px max(9px,env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:center}nav button{font-size:14px;min-height:44px}nav button.primary{padding-inline:14px}.row{display:grid;grid-template-columns:76px minmax(0,1fr);width:100%;gap:12px;align-items:start;text-align:left;margin:8px 0}
 .row-photo{width:76px;height:48px;display:grid;grid-template:100% / 100%;place-items:center;background:#f5f3ec;border-radius:5px;overflow:hidden}
 .row-photo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center top}
 .row-photo small{font-size:.75rem;color:#456158}
@@ -17,6 +21,10 @@
 nav {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;max-width:660px;margin:auto}
 nav button {font-size:clamp(10px,3vw,14px);padding:5px 2px;white-space:normal;border-radius:7px}
 nav button.primary {padding-inline:2px}
+nav button {min-width:0}
+input,textarea,select,button {max-width:100%}
+input,textarea,select {font-size:max(1rem,1em)}
+textarea {resize:vertical}
 .panel {border:1px solid #bdc9bc;border-radius:12px;padding:16px;background:#fffdf8;margin:12px 0}
 .panel h3 {margin:0 0 8px;font-size:1rem}
 .bar h3 {margin:0}
@@ -39,7 +47,7 @@ nav button.primary {padding-inline:2px}
 .ocr-row select {display:block;margin-top:3px;text-overflow:ellipsis;min-height:44px}
 .ocr-row button {min-height:44px}
 #ocrFill {margin-top:6px}
-</style></head><body><main><h1>名刺手帖</h1>
+</style></head><body><main><header class="app-header"><h1>名刺手帖</h1><button type="button" id="backPage" disabled>戻る</button></header>
 <section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・メモ・電話の下4桁"></label>
 <div class="list-controls">
  <button id="showAllCards" type="button">全件表示</button>
@@ -176,7 +184,7 @@ nav button.primary {padding-inline:2px}
  </div>
 </details>
 <label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
-<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav hidden><button id="all">名刺一覧</button><button id="shoot" class="primary">＋ 撮る</button><button id="cal">カレンダー</button><button id="share">共有・出力</button><button id="settingsTab">設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
+<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="share" disabled>共有・出力</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
 <script src="./storage.js?v=2"></script>
 <script src="./exports.js?v=8"></script>
 <script>
@@ -187,7 +195,7 @@ const mapSearch = isAndroid ? 'https://www.google.com/maps/search/?api=1&query='
 const keys=['person','memo','date','company','role','tel','mobile','address','email'];
 const pad=n=>String(n).padStart(2,'0');
 function localDate(d){return [d.getFullYear(),pad(d.getMonth()+1),pad(d.getDate())].join('-')}
-let selected=localDate(new Date()), mode='all', rows=[], draft, savePending=false, appLock=null, appKey=null;
+let selected=localDate(new Date()), mode='all', rows=[], draft, editorBusy=false, appLock=null, appKey=null;
 function message(s){$('notice').textContent=s;$('shootNext').hidden=s!=='保存しました。'}
 function openPhotoPicker(id){
  const picker = $(id);
@@ -307,75 +315,147 @@ $('showAllCards').onclick=()=>{
  $('query').value='';
  draw();
 };
-function show(screen) {
+const pageHistory = [];
+const menuIds = ['all', 'shoot', 'cal', 'share', 'settingsTab'];
+let currentScreen;
+
+function navigationBlocked() {
+ return !currentScreen || currentScreen === 'locked' || editorBusy;
+}
+function updateNavigation() {
+ const blocked = navigationBlocked();
+ for (const id of menuIds) $(id).disabled = blocked;
+ $('backPage').disabled = blocked || !pageHistory.length;
+}
+function setEditorBusy(busy) {
+ editorBusy = busy;
+ $('fields').disabled = busy;
+ updateNavigation();
+}
+function pageState() {
+ const state = {screen: currentScreen, mode};
+ if (currentScreen === 'editor') {
+  state.draft = draft;
+  state.saved = !$('remove').hidden;
+  state.fields = keys.map(key => field(key).value);
+  state.ocr = $('ocr').value;
+  state.ocrOpen = $('ocrPanel').open;
+  state.moreOpen = $('more').open;
+ }
+ return state;
+}
+function show(screen, nextMode = mode) {
+ if (screen === 'locked') {
+  pageHistory.length = 0;
+ } else if (currentScreen && currentScreen !== 'locked' &&
+   (screen !== currentScreen || nextMode !== mode || screen === 'editor')) {
+  pageHistory.push(pageState());
+ }
+ renderScreen(screen, nextMode);
+}
+function renderScreen(screen, nextMode) {
+ currentScreen = screen;
+ mode = nextMode;
  for (const id of ['browse', 'editor', 'settings', 'exports', 'locked']) {
   $(id).hidden = id !== screen;
  }
- document.querySelector('nav').hidden = screen === 'locked' || screen === 'editor';
+ updateNavigation();
  for (const [id, active] of [['all', screen==='browse' && mode==='all'], ['cal', screen==='browse' && mode==='cal'], ['share', screen==='exports'], ['settingsTab', screen==='settings']]) {
   $(id).classList.toggle('active', active);
   $(id).setAttribute('aria-pressed', active);
  }
+ if (screen === 'browse') draw();
  scrollTo(0, 0);
 }
-function home(){show('browse');draw()}
-for(const id of ['all','cal'])$(id).onclick=()=>{mode=id;home();message('')};
-function preview(){const p=$('preview');p.hidden=!draft.image;if(draft.image)p.src=draft.image;else p.removeAttribute('src')}
-function edit(row){
- draft=row?{...row}:{id:crypto.randomUUID(),created:Date.now(),date:localDate(new Date()),image:''};form.reset();for(const k of keys)field(k).value=draft[k]||'';
- $('more').open=false;$('ocrPanel').open=false;$('remove').hidden=!row;$('shareCard').hidden=!row;$('exportContact').hidden=!row;$('formTitle').textContent=row?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
- for(const [value,label,url] of [[draft.tel,'代表に電話','tel:'],[draft.mobile,'直通に電話','tel:'],[draft.email,'メール','mailto:'],[draft.address,'地図',mapSearch]])if(value){const a=node('a',label);a.href=url+(url==='tel:'?value.replace(/[^\d+]/g,''):encodeURIComponent(value));$('actions').append(a)}
- preview();show('editor');message('')
+function goBack() {
+ if (navigationBlocked() || !pageHistory.length) return;
+ const previous = pageHistory.pop();
+ if (previous.screen === 'editor') {
+  populateEditor(previous.draft, previous.saved);
+  keys.forEach((key, index) => {field(key).value = previous.fields[index]});
+  $('ocr').value = previous.ocr;
+  $('ocrPanel').open = previous.ocrOpen;
+  $('more').open = previous.moreOpen;
+ }
+ renderScreen(previous.screen, previous.mode);
+ message('');
 }
-$('manual').onclick=()=>edit();$('cancel').onclick=home;$('shoot').onclick=openCamera;$('shootNext').onclick=openCamera;
+function home(){show('browse')}
+for(const id of ['all','cal'])$(id).onclick=()=>{show('browse',id);message('')};
+$('backPage').onclick = goBack;
+function preview(){const p=$('preview');p.hidden=!draft.image;if(draft.image)p.src=draft.image;else p.removeAttribute('src')}
+function edit(row) {
+ if (navigationBlocked()) return;
+ show('editor');
+ const record = row || {id:crypto.randomUUID(),created:Date.now(),date:localDate(new Date()),image:''};
+ populateEditor(record, Boolean(row));
+ message('');
+}
+function populateEditor(record, saved) {
+ draft={...record};
+ form.reset();
+ for(const key of keys)field(key).value=draft[key]||'';
+ $('more').open=false;$('ocrPanel').open=false;$('remove').hidden=!saved;$('shareCard').hidden=!saved;$('exportContact').hidden=!saved;$('formTitle').textContent=saved?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
+ for(const [value,label,url] of [[draft.tel,'代表に電話','tel:'],[draft.mobile,'直通に電話','tel:'],[draft.email,'メール','mailto:'],[draft.address,'地図',mapSearch]])if(value){const a=node('a',label);a.href=url+(url==='tel:'?value.replace(/[^\d+]/g,''):encodeURIComponent(value));$('actions').append(a)}
+ preview();
+}
+$('manual').onclick=()=>edit();$('cancel').onclick=goBack;$('shoot').onclick=openCamera;$('shootNext').onclick=openCamera;
 async function loadPhoto(file){
- $('fields').disabled=true;const url=URL.createObjectURL(file);
+ if (navigationBlocked()) return;
+ setEditorBusy(true);const url=URL.createObjectURL(file);
  try{const im=new Image();im.src=url;await im.decode();const ratio=Math.min(1,1800/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(im.width*ratio));cv.height=Math.max(1,Math.round(im.height*ratio));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);draft.image=cv.toDataURL('image/jpeg',.86);preview();message('')}
- catch{message('画像を読み込めません。別の写真を選択してください。')}finally{URL.revokeObjectURL(url);$('fields').disabled=false}
+ catch{message('画像を読み込めません。別の写真を選択してください。')}finally{URL.revokeObjectURL(url);setEditorBusy(false)}
 }
 function registerSelectedPhoto(event){
  const file = event.target.files[0];
- if (!file || savePending) return;
+ if (!file || navigationBlocked()) return;
  edit();
  loadPhoto(file);
 }
 $('camera').onchange = registerSelectedPhoto;
 $('gallery').onchange = registerSelectedPhoto;
 $('photo').onchange=e=>{if(e.target.files[0])loadPhoto(e.target.files[0])};
-async function commit(action,msg){
- $('fields').disabled=true;
- try{
+async function commit(prepare, msg) {
+ if (editorBusy) return;
+ const cardId = draft.id;
+ setEditorBusy(true);
+ try {
+  const action = await prepare();
   await storage.write(appLock, action);
   await refresh();
-  home();
+  for (let i=pageHistory.length-1; i>=0; i--) {
+   if (pageHistory[i].draft?.id === cardId) pageHistory.splice(i, 1);
+  }
+  const previous = pageHistory.at(-1);
+  if (previous?.screen === 'browse' && previous.mode === mode) pageHistory.pop();
+  renderScreen('browse', mode);
   message(msg);
-  return true;
- }catch(error){
+ } catch (error) {
   message(error?.message || '保存処理に失敗しました。空き容量をご確認ください。');
-  return false;
- }finally{$('fields').disabled=false}
+ } finally {
+  setEditorBusy(false);
+ }
 }
-form.onsubmit=async e=>{
+form.onsubmit=e=>{
  e.preventDefault();
- if(savePending)return;
- for(const k of keys)draft[k]=field(k).value.trim();
- if(!draft.image&&!keys.some(k=>k!=='date'&&draft[k])){
+ if(editorBusy)return;
+ const card = {...draft};
+ for(const key of keys)card[key]=field(key).value.trim();
+ if(!card.image&&!keys.some(key=>key!=='date'&&card[key])){
   message('写真または名刺の情報を入力してください。');
   return;
  }
- savePending=true;
- $('fields').disabled=true;
- try {
-  const entry = await storage.pack(draft, appKey);
-  await commit(s=>s.put(entry),'保存しました。');
- } catch {
-  message('名刺を保存できませんでした。');
- } finally {
-  $('fields').disabled=false;
-  savePending=false;
+ commit(async () => {
+  const entry = await storage.pack(card, appKey);
+  return store => store.put(entry);
+ }, '保存しました。');
+};
+$('remove').onclick=()=>{
+ if(confirm('この名刺を削除しますか？')){
+  const id = draft.id;
+  commit(() => store => store.delete(id), '削除しました。');
  }
 };
-$('remove').onclick=()=>{if(confirm('この名刺を削除しますか？'))commit(s=>s.delete(draft.id),'削除しました。')};
 if (isAndroid) {
  $('ocrHelp').textContent = 'Google フォトなどで写真を開き、Google レンズでコピーした文字を貼り付けます。';
  if (!matchMedia('(display-mode: standalone)').matches) {

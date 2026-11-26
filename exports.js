@@ -188,5 +188,64 @@ const output = (() => {
   return format === 'pdf' ? [new File([pdf(images)], name + '.pdf', {type: 'application/pdf'})] : files;
  }
 
- return {columns, width, csv, createFiles};
+ function escapeContactText(value) {
+  return value.replaceAll('\\', '\\\\').replace(/\r\n?|\n/gu, '\\n')
+   .replaceAll(';', '\\;').replaceAll(',', '\\,');
+ }
+
+ function foldContactLine(line, encoder) {
+  let head = '';
+  let bytes = 0;
+  for (const character of line) {
+   const size = encoder.encode(character).length;
+   if (bytes + size > 75) {
+    head += '\r\n ';
+    bytes = 1;
+   }
+   head += character;
+   bytes += size;
+  }
+  return head;
+ }
+
+ function contactFile(card) {
+  const {person, company, role, tel, mobile, address, email} = Object.fromEntries(
+   ['person', 'company', 'role', 'tel', 'mobile', 'address', 'email']
+    .map(key => [key, String(card[key] ?? '').trim()])
+  );
+  const name = person || company || tel || mobile || email || address || role;
+  if (!name) return null;
+
+  // Separate an explicitly spaced Japanese name into family and given names.
+  const nameParts = person.split(/\s+/u);
+  const japaneseName = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(person);
+  const [family, given] = japaneseName && nameParts.length === 2 ? nameParts : ['', person];
+  const escape = escapeContactText;
+  const lines = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + escape(name),
+   'N:' + [family, given, '', '', ''].map(escape).join(';')];
+  if (company) lines.push('ORG:' + escape(company));
+  if (role) lines.push('TITLE:' + escape(role));
+  if (tel) lines.push('TEL;TYPE=WORK,VOICE:' + escape(tel.normalize('NFKC')));
+  if (mobile) {
+   const number = mobile.normalize('NFKC');
+   const digits = number.replace(/\D/gu, '');
+   const type = /^(?:0|81)(?:60|70|80|90)\d{8}$/u.test(digits) ? 'CELL' : 'WORK,VOICE';
+   lines.push('TEL;TYPE=' + type + ':' + escape(number));
+  }
+  if (email) lines.push('EMAIL;TYPE=INTERNET,WORK:' + escape(email));
+  if (address) {
+   const postal = address.match(/^〒?\s*([\d０-９]{3})[\s‐‑‒–—―−－-]*([\d０-９]{4})(?![\d０-９])\s*/u);
+   const code = postal ? (postal[1] + '-' + postal[2]).normalize('NFKC') : '';
+   const street = postal ? address.slice(postal[0].length) : address;
+   lines.push('ADR;TYPE=WORK:' + ['', '', street, '', '', code, ''].map(escape).join(';'));
+  }
+  lines.push('END:VCARD');
+  const encoder = new TextEncoder();
+  const content = lines.map(line => foldContactLine(line, encoder)).join('\r\n') + '\r\n';
+  const safeName = Array.from((person || company || '名刺手帖').replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/gu, '_'))
+   .slice(0, 60).join('').replace(/[. ]+$/u, '');
+  return new File([content], (safeName || '名刺手帖') + '.vcf', {type: 'text/vcard;charset=utf-8'});
+ }
+
+ return {columns, width, csv, createFiles, contactFile};
 })();

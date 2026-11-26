@@ -292,6 +292,22 @@ function showExports(id) {
 
 $('share').onclick = () => showExports();
 $('shareCard').onclick = () => showExports(draft.id);
+$('exportContact').onclick = () => {
+ const file = output.contactFile(draft);
+ if (!file) {
+  message('氏名や電話番号などを入力して保存すると、アドレスファイルを出力できます。');
+  return;
+ }
+ const url = URL.createObjectURL(file);
+ const link = node('a', '');
+ link.href = url;
+ link.download = file.name;
+ document.body.append(link);
+ link.click();
+ link.remove();
+ setTimeout(() => URL.revokeObjectURL(url), 30000);
+ message('アドレスファイル（.vcf）を出力しました。');
+};
 $('selectAll').onclick = () => {
  for (const card of rows) selectedCards.add(card.id);
  renderSelection();

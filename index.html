@@ -175,10 +175,10 @@ nav button.primary {padding-inline:2px}
   <p id="ocrStatus" class="hint" role="status"></p>
  </div>
 </details>
-<label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="remove">削除</button></fieldset></form>
+<label>氏名<input name="person"></label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
 <p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav hidden><button id="all">名刺一覧</button><button id="shoot" class="primary">＋ 撮る</button><button id="cal">カレンダー</button><button id="share">共有・出力</button><button id="settingsTab">設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
 <script src="./storage.js?v=2"></script>
-<script src="./exports.js?v=2"></script>
+<script src="./exports.js?v=8"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id), form=$('editor'), field=k=>form.elements.namedItem(k);
@@ -323,7 +323,7 @@ for(const id of ['all','cal'])$(id).onclick=()=>{mode=id;home();message('')};
 function preview(){const p=$('preview');p.hidden=!draft.image;if(draft.image)p.src=draft.image;else p.removeAttribute('src')}
 function edit(row){
  draft=row?{...row}:{id:crypto.randomUUID(),created:Date.now(),date:localDate(new Date()),image:''};form.reset();for(const k of keys)field(k).value=draft[k]||'';
- $('more').open=false;$('ocrPanel').open=false;$('remove').hidden=!row;$('shareCard').hidden=!row;$('formTitle').textContent=row?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
+ $('more').open=false;$('ocrPanel').open=false;$('remove').hidden=!row;$('shareCard').hidden=!row;$('exportContact').hidden=!row;$('formTitle').textContent=row?'名刺の詳細':'名刺を登録';$('actions').replaceChildren();
  for(const [value,label,url] of [[draft.tel,'代表に電話','tel:'],[draft.mobile,'直通に電話','tel:'],[draft.email,'メール','mailto:'],[draft.address,'地図',mapSearch]])if(value){const a=node('a',label);a.href=url+(url==='tel:'?value.replace(/[^\d+]/g,''):encodeURIComponent(value));$('actions').append(a)}
  preview();show('editor');message('')
 }
@@ -410,5 +410,5 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=5"></script>
-<script src="./screens.js?v=2"></script>
+<script src="./screens.js?v=8"></script>
 </body></html>

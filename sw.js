@@ -2,9 +2,9 @@
 
 const scope = self.registration.scope;
 const prefix = 'meishi-techo:' + scope + ':';
-const cacheName = prefix + '1.4.1';
+const cacheName = prefix + '1.4.2';
 const entry = new URL('./index.html', scope).href;
-const assets = ['index.html', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'storage.js?v=13', 'exports.js?v=14', 'visit-csv.js?v=14.1', 'visits.js?v=14.1', 'screens.js?v=13', 'card-text.js?v=12', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
+const assets = ['index.html', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'storage.js?v=13', 'exports.js?v=14', 'visit-csv.js?v=14.2', 'visits.js?v=14.2', 'screens.js?v=13', 'card-text.js?v=12', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', event => {
  event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(assets.map(asset => new Request(new URL(asset, scope), {cache:'reload'})))));

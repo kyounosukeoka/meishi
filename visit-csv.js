@@ -10,7 +10,6 @@ const visitCsv = (() => {
   ['locationAt','位置取得日時'], ['cardIds','紐付け名刺ID'],
  ];
  const exampleId = '記入例（取り込み対象外）';
- const idPattern = /^[A-Za-z0-9_-]{1,128}$/u;
  const pad = value => String(value).padStart(2,'0');
 
  function stage(visit) {
@@ -123,7 +122,6 @@ const visitCsv = (() => {
    'followUpDate','latitude','longitude','accuracy','locationAt','cardIds'];
   for (const key of trimKeys) if (typeof row[key] === 'string') row[key] = row[key].trim();
   function fail(message) {throw new Error(rowNumber + '行目：' + message)}
-  if (row.id && !idPattern.test(row.id)) fail('訪問IDの形式が正しくありません。');
   const visitDate = date(row.date);
   const visitTime = time(row.time);
   if (!visitDate || !visitTime || !row.company || !row.place || !row.purpose) {
@@ -168,7 +166,6 @@ const visitCsv = (() => {
   }
   const indices = labels.map(label => header.indexOf(label));
   const visits = [];
-  const ids = new Set();
   for (const [index, row] of data.entries()) {
    if (row.every(value => !value.trim())) continue;
    const line = index + 2;
@@ -176,8 +173,6 @@ const visitCsv = (() => {
    const values = indices.map(i => row[i]);
    if (values[0].trim() === exampleId) continue;
    const visit = readRecord(values,line);
-   if (visit.id && ids.has(visit.id)) throw new Error(line + '行目：同じ訪問IDがファイル内で重複しています。');
-   if (visit.id) ids.add(visit.id);
    visits.push(visit);
   }
   return visits;

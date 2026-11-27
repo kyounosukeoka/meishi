@@ -485,36 +485,32 @@ const visitApp = (() => {
     return false;
    }
    const existing = await storage.unpack(state.visits, key, 'visit');
-   const byId = new Map(existing.map(visit => [visit.id,visit]));
    const sameContent = new Set(existing.map(visitCsv.fingerprint));
-   const changes = [];
-   let added = 0, updated = 0, skipped = 0;
+   const additions = [];
+   let skipped = 0;
    for (const record of incoming) {
-    const previous = byId.get(record.id);
-    const entry = {...record, id: record.id || crypto.randomUUID(), cardIds:record.cardIds ?? previous?.cardIds ?? []};
+    const entry = {...record, cardIds:record.cardIds ?? []};
     const signature = visitCsv.fingerprint(entry);
-    if ((previous && signature === visitCsv.fingerprint(previous)) || (!record.id && sameContent.has(signature))) {
+    if (sameContent.has(signature)) {
      skipped++;
      continue;
     }
     sameContent.add(signature);
-    changes.push({...entry,version:crypto.randomUUID()});
-    if (previous) updated++;
-    else added++;
+    additions.push({...entry,id:crypto.randomUUID(),version:crypto.randomUUID()});
    }
-   const counts = '新規 ' + added + '件、更新 ' + updated + '件、重複・変更なし ' + skipped + '件';
+   const counts = '新規追加 ' + additions.length + '件、同じ内容のため省略 ' + skipped + '件';
    if (sessionAtStart !== session || lock?.id !== appLock?.id) return false;
-   if (!changes.length) {
-    message('取り込む変更がありません。' + counts);
+   if (!additions.length) {
+    message('追加する訪問記録がありません。' + counts);
     return false;
    }
-   if (!confirm(counts + 'を確認しました。同じ訪問IDは更新して取り込みますか？')) return false;
+   if (!confirm(counts + '。既存の訪問記録を残したまま追加しますか？')) return false;
    const packed = [];
-   for (const visit of changes) packed.push(await storage.pack(visit, key, 'visit'));
+   for (const visit of additions) packed.push(await storage.pack(visit, key, 'visit'));
    if (sessionAtStart !== session || lock?.id !== appLock?.id) return false;
-   await storage.write(lock, (_, store) => {for (const item of packed) store.put(item)}, {revision:state.revision,lock});
+   await storage.write(lock, (_, store) => {for (const item of packed) store.add(item)}, {revision:state.revision,lock});
    if (sessionAtStart !== session || lock?.id !== appLock?.id) return false;
-   if (!changes.some(visit => visit.date === day)) day = changes.map(visit => visit.date).sort()[0];
+   if (!additions.some(visit => visit.date === day)) day = additions.map(visit => visit.date).sort()[0];
    await refresh();
    message('CSVを取り込みました。' + counts);
    return true;

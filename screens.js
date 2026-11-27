@@ -62,6 +62,7 @@ function enterLocked(lock) {
  appKey = null;
  rows = [];
  draft = null;
+ visitApp.clear();
  form.reset();
  $('preview').removeAttribute('src');
  $('actions').replaceChildren();
@@ -132,11 +133,16 @@ async function changeLock(password) {
  if (state.lock?.id !== appLock?.id) throw new Error();
  const next = password ? await storage.makeLock(password) : {key: null, lock: null};
  const cards = await storage.unpack(state.entries, appKey);
+ const visits = await storage.unpack(state.visits, appKey, 'visit');
  const entries = [];
+ const visitEntries = [];
  for (const card of cards) entries.push(await storage.pack(card, next.key));
- await storage.write(appLock, store => {
+ for (const visit of visits) visitEntries.push(await storage.pack(visit, next.key, 'visit'));
+ await storage.write(appLock, (store, visitStore) => {
   store.clear();
+  visitStore.clear();
   for (const entry of entries) store.put(entry);
+  for (const entry of visitEntries) visitStore.put(entry);
  }, {revision: state.revision, lock: next.lock});
  appKey = next.key;
  appLock = next.lock;
@@ -172,7 +178,7 @@ $('passwordForm').onsubmit = event => {
  updateLock(password);
 };
 $('disableLock').onclick = () => {
- if (confirm('起動ロックを解除し、端末内の名刺を暗号化なしで保存しますか？')) updateLock(null);
+ if (confirm('起動ロックを解除し、端末内の名刺と訪問記録を暗号化なしで保存しますか？')) updateLock(null);
 };
 $('lockNow').onclick = () => {
  enterLocked(appLock);
@@ -188,9 +194,15 @@ $('backupForm').onsubmit = event => {
  }
  clearResult('backupResult');
  busy(event.currentTarget, async () => {
-  const cards = await readCards();
   const lockId = appLock?.id;
-  const payload = await storage.backup({format: 'meishi-1', cards}, password);
+  const state = await storage.read();
+  if (state.lock?.id !== lockId) {
+   enterLocked(state.lock);
+   return;
+  }
+  const cards = await storage.unpack(state.entries, appKey);
+  const visits = await storage.unpack(state.visits, appKey, 'visit');
+  const payload = await storage.backup({format: 'meishi-1', cards, visits}, password);
   if (!$('locked').hidden || lockId !== appLock?.id) return;
   const name = 'meishi-backup-' + localDate(new Date()) + '.json';
   showFiles('backupResult', [new File([JSON.stringify(payload)], name, {type: 'application/json'})], '名刺手帖のバックアップ');
@@ -223,13 +235,17 @@ $('restoreForm').onsubmit = event => {
   let parsed = JSON.parse(await file.text());
   if (parsed?.format === 'meishi-backup-1') parsed = await storage.restore(parsed, password);
   const cards = validatedCards(parsed);
+  const visits = visitApp.validateBackup(parsed.visits);
   if (!$('locked').hidden || lock?.id !== appLock?.id) return;
-  if (!confirm(cards.length + '枚を復元しますか？ 同じIDの名刺はバックアップの内容で更新されます。')) return;
+  if (!confirm('名刺 ' + cards.length + '枚と訪問記録 ' + visits.length + '件を復元しますか？ 同じIDの記録は更新されます。')) return;
   const entries = [];
+  const visitEntries = [];
   for (const card of cards) entries.push(await storage.pack(card, key));
+  for (const visit of visits) visitEntries.push(await storage.pack(visit, key, 'visit'));
   if (!$('locked').hidden || lock?.id !== appLock?.id) return;
-  await storage.write(lock, store => {
+  await storage.write(lock, (store, visitStore) => {
    for (const entry of entries) store.put(entry);
+   for (const entry of visitEntries) visitStore.put(entry);
   });
   await refresh();
   $('restoreForm').reset();

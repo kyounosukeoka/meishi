@@ -19,7 +19,7 @@ html{scroll-padding-top:calc(68px + env(safe-area-inset-top,0px))}button,input,t
 .list-controls label{display:grid;gap:3px;margin:0;font-size:.875rem}
 .list-controls select{min-height:44px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;gap:2px}.grid button{padding:4px 0;min-height:58px}.grid small{display:block}.bar{display:flex;align-items:center;justify-content:space-between}fieldset{min-width:0}#preview{max-width:100%;max-height:40vh;display:block;margin:auto}fieldset{border:0;padding:0;margin:0}a{color:#235f4a;margin-right:12px}button:disabled{opacity:.5}[hidden]{display:none!important}
 
-nav {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;max-width:660px;margin:auto}
+nav {display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;max-width:660px;margin:auto}
 nav button {font-size:clamp(10px,3vw,14px);padding:5px 2px;white-space:normal;border-radius:7px}
 nav button.primary {padding-inline:2px}
 nav button {min-width:0}
@@ -51,6 +51,22 @@ textarea {resize:vertical}
 .ocr-row select {display:block;margin-top:3px;text-overflow:ellipsis;min-height:44px}
 .ocr-row button {min-height:44px}
 #ocrFill {margin-top:6px}
+.visit-actions {display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.visit-actions button {min-height:44px}
+.visit-date {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;margin:12px 0}
+.visit-date label {min-width:0;margin:0}
+.visit-hero {background:#eaf0e8}
+.visit-hero h3 {font-size:1.35rem;line-height:1.35}
+.visit-hero p,.visit-summary p {margin:6px 0;white-space:pre-wrap}
+.visit-primary {width:100%;min-height:54px;font-size:1.1rem;margin:8px 0 0}
+.visit-list {list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.visit-list button {width:100%;text-align:left;min-height:54px}
+.visit-list strong,.visit-list small {display:block}
+.visit-list small,.visit-stage {color:#456158}
+.visit-card-choices {display:grid;gap:6px;max-height:240px;overflow-y:auto}
+.visit-card-choices label {margin:0;display:flex;gap:8px;align-items:center;padding:6px}
+.visit-card-choices input {width:1.1rem;flex:none}
+#visitStatus {min-height:1.5em}
 </style></head><body><main><header class="app-header"><h1>名刺手帖</h1><button type="button" id="backPage" disabled>戻る</button></header>
 <section id="browse" hidden><div id="searchBox"><label>名刺を検索<input id="query" type="search" placeholder="氏名・社名・メモ・電話の下4桁"></label>
 <div class="list-controls">
@@ -74,7 +90,7 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.2.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.3.0</strong></div>
  </section>
  <section id="androidSetup" class="panel" hidden>
   <h3>ホーム画面から開く</h3>
@@ -93,11 +109,11 @@ textarea {resize:vertical}
    <button id="lockNow" type="button">今すぐロック</button>
    <button id="disableLock" type="button">起動ロックを解除</button>
   </div>
-  <p class="hint">起動ロックを有効にすると、写真と連絡先を端末内で暗号化します。パスワードは再発行できません。</p>
+  <p class="hint">起動ロックを有効にすると、名刺の写真・連絡先と訪問記録を端末内で暗号化します。パスワードは再発行できません。</p>
  </section>
  <section class="panel">
   <h3>パスワード付きバックアップ</h3>
-  <p class="hint">写真を含む全件を復元用のファイルに保存します。バックアップ用に独立したパスワードを設定できます。</p>
+  <p class="hint">名刺の写真を含む全件と訪問記録を復元用のファイルに保存します。バックアップ用に独立したパスワードを設定できます。</p>
   <form id="backupForm">
    <label>バックアップ用のパスワード（8文字以上）<input id="backupPassword" type="password" required minlength="8" autocomplete="new-password"></label>
    <label>確認用のパスワード<input id="backupConfirm" type="password" required minlength="8" autocomplete="new-password"></label>
@@ -152,6 +168,59 @@ textarea {resize:vertical}
   <div id="exportResult"></div>
  </form>
 </section>
+<section id="visits" hidden>
+ <div class="bar"><h2>訪問記録</h2><button type="button" id="addVisit">＋ 予定を登録</button></div>
+ <div id="visitHero" class="panel visit-hero" hidden></div>
+ <div class="visit-date">
+  <label>表示する日<input type="date" id="visitDay"></label>
+  <button type="button" id="todayVisits">今日</button>
+ </div>
+ <div id="visitList"></div>
+</section>
+
+<section id="visitPlan" hidden>
+ <h2 id="visitPlanTitle">訪問予定を登録</h2>
+ <form id="visitPlanForm" class="panel">
+  <label>訪問日<input type="date" name="date" required></label>
+  <label>訪問予定時刻<input type="time" name="time" required></label>
+  <label>訪問会社名<input type="text" name="company" required></label>
+  <label>担当者名（任意）<input type="text" name="person"></label>
+  <label>訪問場所<input type="text" name="place" placeholder="住所・支店名など" required></label>
+  <label>訪問内容<textarea name="purpose" rows="3" required></textarea></label>
+  <button type="submit" class="primary">予定を保存</button>
+ </form>
+</section>
+
+<section id="visitRecord" hidden>
+ <h2 id="visitRecordTitle">訪問の詳細</h2>
+ <div class="panel visit-summary" id="visitSummary"></div>
+ <div id="visitRecordingActions" class="visit-actions">
+  <button type="button" id="editVisitPlan">予定を編集</button>
+  <button type="button" id="deleteVisit">予定を削除</button>
+ </div>
+ <button type="button" id="startVisit" class="primary visit-primary" hidden>訪問開始</button>
+ <button type="button" id="endVisit" class="primary visit-primary" hidden>訪問終了</button>
+ <p id="visitStatus" class="hint" role="status"></p>
+ <form id="visitAfterForm" hidden>
+  <div class="panel">
+   <h3>訪問後のメモ</h3>
+   <label>メモ<textarea name="note" rows="4" placeholder="話したこと・確認したこと"></textarea></label>
+   <label>いつまでに<input type="date" name="followUpDate"></label>
+   <label>何をする<input type="text" name="followUpTask" placeholder="例：見積書を送る"></label>
+  </div>
+  <div class="panel">
+   <h3>この訪問に紐付ける名刺</h3>
+   <p id="visitLinkedNames" class="hint"></p>
+   <details id="visitCardPicker">
+    <summary>登録済みの名刺から選ぶ</summary>
+    <label>社名・氏名で検索<input type="search" id="visitCardSearch"></label>
+    <div class="visit-card-choices" id="visitCardChoices"></div>
+   </details>
+  </div>
+  <button type="submit" class="primary">訪問後の内容を保存</button>
+ </form>
+</section>
+
 <form id="editor" hidden><fieldset id="fields"><h2 id="formTitle"></h2><img id="preview" alt="名刺写真" hidden>
 <div class="photo-actions">
  <button id="choosePhoto" type="button">写真を選択・変更</button>
@@ -198,8 +267,8 @@ textarea {resize:vertical}
 <label id="unparsedName" hidden>氏名（区切り不明）<input name="person" autocomplete="off">
  <span class="hint">姓・名を入力すると、その内容で保存します。</span>
 </label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
-<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="share" disabled>共有・出力</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
-<script src="./storage.js?v=2"></script>
+<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="visitsTab" disabled>訪問</button><button id="share" disabled>共有・出力</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
+<script src="./storage.js?v=13"></script>
 <script src="./exports.js?v=12"></script>
 <script>
 'use strict';
@@ -333,11 +402,11 @@ $('showAllCards').onclick=()=>{
  draw();
 };
 const pageHistory = [];
-const menuIds = ['all', 'shoot', 'cal', 'share', 'settingsTab'];
+const menuIds = ['all', 'shoot', 'cal', 'visitsTab', 'share', 'settingsTab'];
 let currentScreen;
 
 function navigationBlocked() {
- return !currentScreen || currentScreen === 'locked' || editorBusy;
+ return !currentScreen || currentScreen === 'locked' || editorBusy || visitApp.isBusy();
 }
 function updateNavigation() {
  const blocked = navigationBlocked();
@@ -359,6 +428,7 @@ function pageState() {
   state.ocrOpen = $('ocrPanel').open;
   state.moreOpen = $('more').open;
  }
+ visitApp.snapshot(state);
  return state;
 }
 function show(screen, nextMode = mode) {
@@ -373,15 +443,16 @@ function show(screen, nextMode = mode) {
 function renderScreen(screen, nextMode) {
  currentScreen = screen;
  mode = nextMode;
- for (const id of ['browse', 'editor', 'settings', 'exports', 'locked']) {
+ for (const id of ['browse', 'editor', 'settings', 'exports', 'locked', 'visits', 'visitPlan', 'visitRecord']) {
   $(id).hidden = id !== screen;
  }
  updateNavigation();
- for (const [id, active] of [['all', screen==='browse' && mode==='all'], ['cal', screen==='browse' && mode==='cal'], ['share', screen==='exports'], ['settingsTab', screen==='settings']]) {
+ for (const [id, active] of [['all', screen==='browse' && mode==='all'], ['cal', screen==='browse' && mode==='cal'], ['share', screen==='exports'], ['settingsTab', screen==='settings'], ['visitsTab', ['visits','visitPlan','visitRecord'].includes(screen)]]) {
   $(id).classList.toggle('active', active);
   $(id).setAttribute('aria-pressed', active);
  }
  if (screen === 'browse') draw();
+ visitApp.render(screen);
  scrollTo(0, 0);
 }
 function goBack() {
@@ -395,6 +466,7 @@ function goBack() {
   $('ocrPanel').open = previous.ocrOpen;
   $('more').open = previous.moreOpen;
  }
+ visitApp.restoreScreen(previous);
  renderScreen(previous.screen, previous.mode);
  message('');
 }
@@ -517,5 +589,6 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./screens.js?v=12"></script>
+<script src="./visits.js?v=13"></script>
+<script src="./screens.js?v=13"></script>
 </body></html>

@@ -10,13 +10,16 @@ const storage = (() => {
  function open() {
   return new Promise((resolve, reject) => {
    const scope = location.pathname.replace(/index\.html$/, '');
-   const request = indexedDB.open('meishi-techo:' + scope, 2);
+   const request = indexedDB.open('meishi-techo:' + scope, 3);
    request.onupgradeneeded = () => {
     const database = request.result;
     if (!database.objectStoreNames.contains('cards')) {
      database.createObjectStore('cards', {keyPath: 'id'});
     }
-    database.createObjectStore('preferences');
+    if (!database.objectStoreNames.contains('preferences')) {
+     database.createObjectStore('preferences');
+    }
+    database.createObjectStore('visits', {keyPath: 'id'});
    };
    request.onblocked = () => {
     message('開いている名刺手帖の画面をすべて閉じてから、この画面を開き直してください。');
@@ -30,13 +33,15 @@ const storage = (() => {
   });
  }
 
- function read() {
+ function read(includeCards = true) {
   return new Promise((resolve, reject) => {
-   const transaction = db.transaction(['cards', 'preferences']);
-   const cards = transaction.objectStore('cards').getAll();
+   const transaction = db.transaction(includeCards ? ['cards', 'visits', 'preferences'] : ['visits', 'preferences']);
+   const cards = includeCards ? transaction.objectStore('cards').getAll() : null;
+   const visits = transaction.objectStore('visits').getAll();
    const prefs = transaction.objectStore('preferences').get('current');
    transaction.oncomplete = () => resolve({
-    entries: cards.result,
+    entries: cards?.result ?? [],
+    visits: visits.result,
     lock: prefs.result?.lock || null,
     revision: prefs.result?.revision || 0,
    });
@@ -46,9 +51,10 @@ const storage = (() => {
 
  function write(lock, action, replacement) {
   return new Promise((resolve, reject) => {
-   const transaction = db.transaction(['cards', 'preferences'], 'readwrite');
+   const transaction = db.transaction(['cards', 'visits', 'preferences'], 'readwrite');
    const prefs = transaction.objectStore('preferences');
    const cards = transaction.objectStore('cards');
+   const visits = transaction.objectStore('visits');
    let conflict = false;
    transaction.oncomplete = resolve;
    transaction.onabort = () => reject(conflict
@@ -62,7 +68,7 @@ const storage = (() => {
      transaction.abort();
      return;
     }
-    action(cards);
+    action(cards, visits);
     prefs.put({
      lock: replacement ? replacement.lock : current.lock,
      revision: current.revision + 1,
@@ -107,16 +113,16 @@ const storage = (() => {
   return key;
  }
 
- async function pack(card, key) {
+ async function pack(card, key, kind = 'card') {
   if (!key) return card;
-  return {id: card.id, sealed: await seal(key, card, 'card:' + card.id)};
+  return {id: card.id, sealed: await seal(key, card, kind + ':' + card.id)};
  }
 
- async function unpack(entries, key) {
+ async function unpack(entries, key, kind = 'card') {
   if (!key) return entries;
   const cards = [];
   for (const entry of entries) {
-   cards.push(await unseal(key, entry.sealed, 'card:' + entry.id));
+   cards.push(await unseal(key, entry.sealed, kind + ':' + entry.id));
   }
   return cards;
  }

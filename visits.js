@@ -444,8 +444,8 @@ const visitApp = (() => {
   }
  };
 
- function downloadCsv(records, name) {
-  const file = new Blob([visitCsv.encode(records)], {type:'text/csv;charset=utf-8'});
+ function downloadCsv(content, name) {
+  const file = new Blob([content], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(file);
   const link = node('a','');
   link.href = url;
@@ -456,14 +456,14 @@ const visitApp = (() => {
   setTimeout(() => URL.revokeObjectURL(url),30000);
  }
 
- $('downloadVisitTemplate').onclick = () => downloadCsv([], '訪問記録_取り込み用ひな形.csv');
+ $('downloadVisitTemplate').onclick = () => downloadCsv(visitCsv.template(day || today()), '訪問記録_取り込み用ひな形.csv');
  $('exportVisitCsv').onclick = async () => {
   const currentDay = day;
   if (await runAction(async () => {
    await refresh();
    if (currentScreen !== 'visits') return false;
    const daily = visits.filter(visit => visit.date === currentDay).sort((a,b) => a.time.localeCompare(b.time));
-   downloadCsv(daily, '訪問記録_' + currentDay + '.csv');
+   downloadCsv(visitCsv.encode(daily), '訪問記録_' + currentDay + '.csv');
    return true;
   })) message(currentDay + ' の訪問CSVを出力しました。');
  };

@@ -90,7 +90,7 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.4.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.4.1</strong></div>
  </section>
  <section id="androidSetup" class="panel" hidden>
   <h3>ホーム画面から開く</h3>
@@ -182,7 +182,7 @@ textarea {resize:vertical}
    <button type="button" id="exportVisitCsv">表示中の日をCSV出力</button>
    <button type="button" id="downloadVisitTemplate">取り込み用ひな形を出力</button>
   </div>
-  <p class="hint">新規の予定は訪問IDと状態を空欄にし、訪問日・予定時刻・会社名・場所・内容を入力します。日付は 2026-11-27、時刻は 09:30 の形式です。</p>
+  <p class="hint">記入例の下の行から入力してください。記入例は取り込まれません。新規の予定は訪問IDと状態を空欄にし、訪問日・予定時刻・会社名・場所・内容を入力します。</p>
   <form id="visitCsvForm">
    <label>CSVファイル<input type="file" id="visitCsvFile" accept=".csv,text/csv" required></label>
    <button type="submit" class="primary">CSVを取り込む</button>
@@ -607,7 +607,7 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./visit-csv.js?v=14"></script>
-<script src="./visits.js?v=14"></script>
+<script src="./visit-csv.js?v=14.1"></script>
+<script src="./visits.js?v=14.1"></script>
 <script src="./screens.js?v=13"></script>
 </body></html>

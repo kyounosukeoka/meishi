@@ -9,6 +9,7 @@ const visitCsv = (() => {
   ['latitude','開始地点の緯度'], ['longitude','開始地点の経度'], ['accuracy','位置精度（m）'],
   ['locationAt','位置取得日時'], ['cardIds','紐付け名刺ID'],
  ];
+ const exampleId = '記入例（取り込み対象外）';
  const idPattern = /^[A-Za-z0-9_-]{1,128}$/u;
  const pad = value => String(value).padStart(2,'0');
 
@@ -66,6 +67,11 @@ const visitCsv = (() => {
    const text = String(value ?? '');
    return output.csvCell(text.startsWith("'") ? "'" + text : text);
   }).join(',')).join('\r\n') + '\r\n';
+ }
+
+ function template(day) {
+  return encode([{id:exampleId,date:day,time:'09:30',company:'株式会社サンプル',
+   person:'山田 太郎',place:'札幌市中央区・本社受付',purpose:'複合機の使用状況を確認'}]);
  }
 
  function splitRows(text) {
@@ -167,7 +173,9 @@ const visitCsv = (() => {
    if (row.every(value => !value.trim())) continue;
    const line = index + 2;
    if (row.length !== header.length) throw new Error(line + '行目：列の数がひな形と一致しません。');
-   const visit = readRecord(indices.map(i => row[i]),line);
+   const values = indices.map(i => row[i]);
+   if (values[0].trim() === exampleId) continue;
+   const visit = readRecord(values,line);
    if (visit.id && ids.has(visit.id)) throw new Error(line + '行目：同じ訪問IDがファイル内で重複しています。');
    if (visit.id) ids.add(visit.id);
    visits.push(visit);
@@ -188,5 +196,5 @@ const visitCsv = (() => {
   return parse(text);
  }
 
- return {stage, date, time, timestamp, asLocalInput, encode, parse, read, fingerprint};
+ return {stage, date, time, timestamp, asLocalInput, encode, template, parse, read, fingerprint};
 })();

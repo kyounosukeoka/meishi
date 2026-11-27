@@ -27,12 +27,14 @@ const output = (() => {
   return value;
  }
 
+ function requiresCsvEscape(text) {
+  // Protect spreadsheet users when importing data or notes entered by someone else.
+  return /^[\t\r\n]/u.test(text) || /^[=+\-@]/u.test(text.normalize('NFKC').trimStart());
+ }
+
  function csvCell(value) {
   const text = String(value ?? '');
-  // Protect spreadsheet users when importing data or notes entered by someone else.
-  const control = /^[\t\r\n]/u.test(text);
-  const formula = /^[=+\-@]/u.test(text.normalize('NFKC').trimStart());
-  return '"' + (control || formula ? "'" : '') + text.replaceAll('"', '""') + '"';
+  return '"' + (requiresCsvEscape(text) ? "'" : '') + text.replaceAll('"', '""') + '"';
  }
 
  function csv(cards, note, katakana, latin) {
@@ -261,5 +263,5 @@ const output = (() => {
   return new File([content], (safeName || '名刺手帖') + '.vcf', {type: 'text/vcard;charset=utf-8'});
  }
 
- return {columns, width, csv, createFiles, contactFile, nameParts};
+ return {columns, width, csv, csvCell, requiresCsvEscape, createFiles, contactFile, nameParts};
 })();

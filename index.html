@@ -90,7 +90,7 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.3.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.4.0</strong></div>
  </section>
  <section id="androidSetup" class="panel" hidden>
   <h3>ホーム画面から開く</h3>
@@ -176,6 +176,18 @@ textarea {resize:vertical}
   <button type="button" id="todayVisits">今日</button>
  </div>
  <div id="visitList"></div>
+ <details class="panel" id="visitCsvPanel">
+  <summary>CSV入出力</summary>
+  <div class="visit-actions">
+   <button type="button" id="exportVisitCsv">表示中の日をCSV出力</button>
+   <button type="button" id="downloadVisitTemplate">取り込み用ひな形を出力</button>
+  </div>
+  <p class="hint">新規の予定は訪問IDと状態を空欄にし、訪問日・予定時刻・会社名・場所・内容を入力します。日付は 2026-11-27、時刻は 09:30 の形式です。</p>
+  <form id="visitCsvForm">
+   <label>CSVファイル<input type="file" id="visitCsvFile" accept=".csv,text/csv" required></label>
+   <button type="submit" class="primary">CSVを取り込む</button>
+  </form>
+ </details>
 </section>
 
 <section id="visitPlan" hidden>
@@ -187,7 +199,12 @@ textarea {resize:vertical}
   <label>担当者名（任意）<input type="text" name="person"></label>
   <label>訪問場所<input type="text" name="place" placeholder="住所・支店名など" required></label>
   <label>訪問内容<textarea name="purpose" rows="3" required></textarea></label>
-  <button type="submit" class="primary">予定を保存</button>
+  <fieldset id="visitActualFields" hidden>
+   <legend>実績の時刻</legend>
+   <label>訪問開始日時<input type="datetime-local" name="startedAt" step="1"></label>
+   <label id="visitEndField">訪問終了日時<input type="datetime-local" name="endedAt" step="1"></label>
+  </fieldset>
+  <button type="submit" class="primary" id="saveVisitPlan">予定を保存</button>
  </form>
 </section>
 
@@ -196,6 +213,7 @@ textarea {resize:vertical}
  <div class="panel visit-summary" id="visitSummary"></div>
  <div id="visitRecordingActions" class="visit-actions">
   <button type="button" id="editVisitPlan">予定を編集</button>
+  <button type="button" id="cancelVisit">訪問を中止</button>
   <button type="button" id="deleteVisit">予定を削除</button>
  </div>
  <button type="button" id="startVisit" class="primary visit-primary" hidden>訪問開始</button>
@@ -269,7 +287,7 @@ textarea {resize:vertical}
 </label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
 <p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="visitsTab" disabled>訪問</button><button id="share" disabled>共有・出力</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
 <script src="./storage.js?v=13"></script>
-<script src="./exports.js?v=12"></script>
+<script src="./exports.js?v=14"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id), form=$('editor'), field=k=>form.elements.namedItem(k);
@@ -589,6 +607,7 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./visits.js?v=13"></script>
+<script src="./visit-csv.js?v=14"></script>
+<script src="./visits.js?v=14"></script>
 <script src="./screens.js?v=13"></script>
 </body></html>

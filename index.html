@@ -2,7 +2,8 @@
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>名刺手帖</title>
 <meta name="theme-color" content="#25493e">
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="apple-touch-icon" href="./tie-180.png">
+<link rel="icon" href="./tie-192.png" type="image/png">
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f7f4ed;color:#253e36;font:16px/1.6 system-ui,sans-serif}html,body{max-width:100%;overflow-x:hidden;overflow-x:clip;overscroll-behavior-x:none}
 body{touch-action:pan-y pinch-zoom;overflow-wrap:anywhere}
@@ -19,7 +20,7 @@ html{scroll-padding-top:calc(68px + env(safe-area-inset-top,0px))}button,input,t
 .list-controls label{display:grid;gap:3px;margin:0;font-size:.875rem}
 .list-controls select{min-height:44px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;gap:2px}.grid button{padding:4px 0;min-height:58px}.grid small{display:block}.bar{display:flex;align-items:center;justify-content:space-between}fieldset{min-width:0}#preview{max-width:100%;max-height:40vh;display:block;margin:auto}fieldset{border:0;padding:0;margin:0}a{color:#235f4a;margin-right:12px}button:disabled{opacity:.5}[hidden]{display:none!important}
 
-nav {display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;max-width:660px;margin:auto}
+nav {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;max-width:660px;margin:auto}
 nav button {font-size:clamp(10px,3vw,14px);padding:5px 2px;white-space:normal;border-radius:7px}
 nav button.primary {padding-inline:2px}
 nav button {min-width:0}
@@ -31,11 +32,9 @@ textarea {resize:vertical}
 .bar h3 {margin:0}
 .hint {font-size:.875rem;color:#456158}
 .buttons {display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-#exportList {max-height:290px;overflow:auto}
 #exportResult a,#backupResult a {display:inline-block;padding:6px 0}
-#exportList label,.choices label {display:flex;align-items:center;gap:8px;padding:7px;margin:0}
-#exportList label {border-bottom:1px solid #e1e5dc;overflow-wrap:anywhere}
-#exportList input,.choices input {width:1.15rem;height:1.15rem;flex:none}
+.choices label {display:flex;align-items:center;gap:8px;padding:7px;margin:0}
+.choices input {width:1.15rem;height:1.15rem;flex:none}
 .choices {display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
 .choices legend {font-weight:600}
 #notice {color:#31574b;font-weight:600}
@@ -59,6 +58,13 @@ textarea {resize:vertical}
 .visit-hero h3 {font-size:1.35rem;line-height:1.35}
 .visit-hero p,.visit-summary p {margin:6px 0;white-space:pre-wrap}
 .visit-primary {width:100%;min-height:54px;font-size:1.1rem;margin:8px 0 0}
+.visit-start-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.visit-start-actions button {padding-inline:5px;font-size:1rem}
+.follow-up-row {min-width:0;margin:8px 0 14px;padding-bottom:10px;border-bottom:1px solid #e1e5dc}
+.follow-up-fields {display:grid;grid-template-columns:minmax(135px,2fr) minmax(0,3fr);gap:8px}
+.follow-up-fields label {min-width:0;margin:0 0 6px}
+.follow-up-fields input {min-width:0;display:block;padding-inline:7px}
+.follow-up-remove {min-height:44px;padding:5px 10px;font-size:.875rem}
 .visit-list {list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .visit-list button {width:100%;text-align:left;min-height:54px}
 .visit-list strong,.visit-list small {display:block}
@@ -90,7 +96,7 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.4.2</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.5.0</strong></div>
  </section>
  <section id="androidSetup" class="panel" hidden>
   <h3>ホーム画面から開く</h3>
@@ -133,12 +139,8 @@ textarea {resize:vertical}
 </section>
 
 <section id="exports" hidden>
- <h2>共有・出力</h2>
- <section class="panel">
-  <div class="bar"><h3>出力する名刺</h3><span id="exportCount"></span></div>
-  <div class="buttons"><button id="selectAll" type="button">全件選択</button><button id="selectNone" type="button">選択を外す</button></div>
-  <div id="exportList"></div>
- </section>
+ <h2>この名刺を出力</h2>
+ <p id="exportCardName"></p>
  <form id="exportForm" class="panel">
   <fieldset id="exportFields">
    <h3>ファイル形式</h3>
@@ -182,7 +184,7 @@ textarea {resize:vertical}
    <button type="button" id="exportVisitCsv">表示中の日をCSV出力</button>
    <button type="button" id="downloadVisitTemplate">取り込み用ひな形を出力</button>
   </div>
-  <p class="hint">記入例の下の行から入力してください。記入例は取り込まれません。新規の予定は訪問IDと状態を空欄にし、訪問日・予定時刻・会社名・場所・内容を入力します。CSVの訪問IDにかかわらず、取り込みは新規追加です。同じ内容の行は追加を省きます。</p>
+  <p class="hint">記入例の下の行から入力してください。記入例は取り込まれません。新規の予定は訪問IDと状態を空欄にし、訪問日・予定時刻・会社名・内容を入力します。担当者名と訪問場所は任意です。時刻は日本時間です。CSVの訪問IDにかかわらず、取り込みは新規追加です。同じ内容の行は追加を省きます。</p>
   <form id="visitCsvForm">
    <label>CSVファイル<input type="file" id="visitCsvFile" accept=".csv,text/csv" required></label>
    <button type="submit" class="primary">CSVを取り込む</button>
@@ -197,10 +199,10 @@ textarea {resize:vertical}
   <label>訪問予定時刻<input type="time" name="time" required></label>
   <label>訪問会社名<input type="text" name="company" required></label>
   <label>担当者名（任意）<input type="text" name="person"></label>
-  <label>訪問場所<input type="text" name="place" placeholder="住所・支店名など" required></label>
+  <label>訪問場所（任意）<input type="text" name="place" placeholder="住所・支店名など"></label>
   <label>訪問内容<textarea name="purpose" rows="3" required></textarea></label>
   <fieldset id="visitActualFields" hidden>
-   <legend>実績の時刻</legend>
+   <legend>実績の時刻（日本時間）</legend>
    <label>訪問開始日時<input type="datetime-local" name="startedAt" step="1"></label>
    <label id="visitEndField">訪問終了日時<input type="datetime-local" name="endedAt" step="1"></label>
   </fieldset>
@@ -216,15 +218,19 @@ textarea {resize:vertical}
   <button type="button" id="cancelVisit">訪問を中止</button>
   <button type="button" id="deleteVisit">予定を削除</button>
  </div>
- <button type="button" id="startVisit" class="primary visit-primary" hidden>訪問開始</button>
+ <div class="visit-start-actions">
+  <button type="button" id="startVisit" class="primary visit-primary" hidden>訪問開始</button>
+  <button type="button" id="parkVisit" class="visit-primary" hidden>駐車完了</button>
+ </div>
  <button type="button" id="endVisit" class="primary visit-primary" hidden>訪問終了</button>
+ <button type="button" id="resumeVisit" class="visit-primary" hidden>訪問継続</button>
  <p id="visitStatus" class="hint" role="status"></p>
  <form id="visitAfterForm" hidden>
   <div class="panel">
    <h3>訪問後のメモ</h3>
    <label>メモ<textarea name="note" rows="4" placeholder="話したこと・確認したこと"></textarea></label>
-   <label>いつまでに<input type="date" name="followUpDate"></label>
-   <label>何をする<input type="text" name="followUpTask" placeholder="例：見積書を送る"></label>
+   <div id="visitFollowUps"></div>
+   <button type="button" id="addFollowUp">＋ 対応予定を追加</button>
   </div>
   <div class="panel">
    <h3>この訪問に紐付ける名刺</h3>
@@ -285,7 +291,7 @@ textarea {resize:vertical}
 <label id="unparsedName" hidden>氏名（区切り不明）<input name="person" autocomplete="off">
  <span class="hint">姓・名を入力すると、その内容で保存します。</span>
 </label><label>ひとことメモ<textarea name="memo" placeholder="その人の特徴・次に話したいこと"></textarea></label><label>受け取った日<input name="date" type="date" required></label><details id="more"><summary>会社・連絡先を入力</summary><label>社名<input name="company"></label><label>部署・役職<input name="role"></label><label>電話番号（代表）<input name="tel" type="tel"></label><label>直通・携帯<input name="mobile" type="tel"></label><label>住所<input name="address"></label><label>メール<input name="email" type="email"></label></details><p id="actions"></p><button id="save" class="primary" type="submit">保存</button> <button type="button" id="cancel">戻る</button> <button type="button" id="shareCard">この名刺を出力</button> <button type="button" id="exportContact" hidden>アドレスファイルで出力</button> <button type="button" id="remove">削除</button></fieldset></form>
-<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="visitsTab" disabled>訪問</button><button id="share" disabled>共有・出力</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
+<p id="notice" role="status"></p><button id="shootNext" hidden>続けて撮る</button></main><nav aria-label="メインメニュー"><button id="all" disabled>名刺一覧</button><button id="shoot" class="primary" disabled>＋ 撮る</button><button id="cal" disabled>カレンダー</button><button id="visitsTab" disabled>訪問</button><button id="settingsTab" disabled>設定</button></nav><input id="camera" type="file" accept="image/*" capture="environment" hidden><input id="gallery" type="file" accept="image/*" hidden>
 <script src="./storage.js?v=13"></script>
 <script src="./exports.js?v=14"></script>
 <script>
@@ -420,7 +426,7 @@ $('showAllCards').onclick=()=>{
  draw();
 };
 const pageHistory = [];
-const menuIds = ['all', 'shoot', 'cal', 'visitsTab', 'share', 'settingsTab'];
+const menuIds = ['all', 'shoot', 'cal', 'visitsTab', 'settingsTab'];
 let currentScreen;
 
 function navigationBlocked() {
@@ -445,6 +451,8 @@ function pageState() {
   state.ocr = $('ocr').value;
   state.ocrOpen = $('ocrPanel').open;
   state.moreOpen = $('more').open;
+ } else if (currentScreen === 'exports') {
+  state.exportCardId = exportCardId;
  }
  visitApp.snapshot(state);
  return state;
@@ -465,7 +473,7 @@ function renderScreen(screen, nextMode) {
   $(id).hidden = id !== screen;
  }
  updateNavigation();
- for (const [id, active] of [['all', screen==='browse' && mode==='all'], ['cal', screen==='browse' && mode==='cal'], ['share', screen==='exports'], ['settingsTab', screen==='settings'], ['visitsTab', ['visits','visitPlan','visitRecord'].includes(screen)]]) {
+ for (const [id, active] of [['all', screen==='browse' && mode==='all'], ['cal', screen==='browse' && mode==='cal'], ['settingsTab', screen==='settings'], ['visitsTab', ['visits','visitPlan','visitRecord'].includes(screen)]]) {
   $(id).classList.toggle('active', active);
   $(id).setAttribute('aria-pressed', active);
  }
@@ -483,6 +491,8 @@ function goBack() {
   $('ocr').value = previous.ocr;
   $('ocrPanel').open = previous.ocrOpen;
   $('more').open = previous.moreOpen;
+ } else if (previous.screen === 'exports' && previous.exportCardId !== exportCardId) {
+  setExportCard(previous.exportCardId);
  }
  visitApp.restoreScreen(previous);
  renderScreen(previous.screen, previous.mode);
@@ -607,7 +617,7 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./visit-csv.js?v=14.2"></script>
-<script src="./visits.js?v=14.2"></script>
-<script src="./screens.js?v=13"></script>
+<script src="./visit-csv.js?v=15"></script>
+<script src="./visits.js?v=15"></script>
+<script src="./screens.js?v=15"></script>
 </body></html>

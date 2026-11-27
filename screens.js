@@ -1,7 +1,7 @@
 'use strict';
 
 const exportForm = $('exportForm');
-const selectedCards = new Set();
+let exportCardId = '';
 const downloadURLs = new Map();
 let exportRevision = 0;
 
@@ -68,8 +68,8 @@ function enterLocked(lock) {
  $('actions').replaceChildren();
  $('query').value = '';
  $('list').replaceChildren();
- $('exportList').replaceChildren();
- selectedCards.clear();
+ $('exportCardName').textContent = '';
+ exportCardId = '';
  $('exportForm').reset();
  $('backupForm').reset();
  $('restoreForm').reset();
@@ -253,33 +253,6 @@ $('restoreForm').onsubmit = event => {
  }, '復元できませんでした。ファイルとパスワードをご確認ください。');
 };
 
-function updateSelection() {
- $('exportCount').textContent = selectedCards.size + '枚選択中';
- $('prepareExport').disabled = !selectedCards.size;
- clearResult('exportResult');
-}
-
-function renderSelection() {
- const list = $('exportList');
- list.replaceChildren();
- if (!rows.length) list.append(node('p', '登録された名刺がありません。'));
- const ordered = [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
- for (const card of ordered) {
-  const label = node('label', '');
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = selectedCards.has(card.id);
-  input.onchange = () => {
-   if (input.checked) selectedCards.add(card.id);
-   else selectedCards.delete(card.id);
-   updateSelection();
-  };
-  label.append(input, node('span', [card.person || '氏名未入力', card.company, card.date].filter(Boolean).join(' · ')));
-  list.append(label);
- }
- updateSelection();
-}
-
 function exportOptions() {
  return {
   format: $('exportFormat').value,
@@ -297,18 +270,21 @@ function updateWidth() {
  clearResult('exportResult');
 }
 
-function showExports(id) {
- selectedCards.clear();
- if (id) selectedCards.add(id);
- else for (const card of rows) selectedCards.add(card.id);
+function setExportCard(id) {
+ const card = rows.find(row => row.id === id);
+ exportCardId = card?.id || '';
  exportForm.reset();
- show('exports');
- renderSelection();
+ $('exportCardName').textContent = card ? [card.person || '氏名未入力', card.company].filter(Boolean).join(' · ') : '名刺が見つかりません。';
+ $('prepareExport').disabled = !card;
  updateWidth();
+}
+
+function showExports(id) {
+ show('exports');
+ setExportCard(id);
  message('');
 }
 
-$('share').onclick = () => showExports();
 $('shareCard').onclick = () => showExports(draft.id);
 $('exportContact').onclick = () => {
  const file = output.contactFile(draft);
@@ -326,30 +302,22 @@ $('exportContact').onclick = () => {
  setTimeout(() => URL.revokeObjectURL(url), 30000);
  message('アドレスファイル（.vcf）を出力しました。');
 };
-$('selectAll').onclick = () => {
- for (const card of rows) selectedCards.add(card.id);
- renderSelection();
-};
-$('selectNone').onclick = () => {
- selectedCards.clear();
- renderSelection();
-};
 $('exportFields').oninput = updateWidth;
 let preparing = false;
 exportForm.onsubmit = async event => {
  event.preventDefault();
- if (preparing || !selectedCards.size) return;
- const cards = rows.filter(card => selectedCards.has(card.id));
+ const card = rows.find(row => row.id === exportCardId);
+ if (preparing || !card) return;
  const options = exportOptions();
  clearResult('exportResult');
  const revision = exportRevision;
  preparing = true;
  $('exportFields').disabled = true;
  try {
-  const files = await output.createFiles(cards, options);
+  const files = await output.createFiles([card], options);
   if (!$('exports').hidden && exportRevision === revision) showFiles('exportResult', files, '名刺情報');
  } catch {
-  message('ファイルを作成できませんでした。選択した名刺をご確認ください。');
+  message('ファイルを作成できませんでした。名刺の内容をご確認ください。');
  } finally {
   preparing = false;
   $('exportFields').disabled = false;

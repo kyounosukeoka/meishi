@@ -8,9 +8,15 @@ const visitCsv = (() => {
   ['followUpDate','対応期限'], ['followUpTask','次にすること'],
   ['latitude','開始地点の緯度'], ['longitude','開始地点の経度'], ['accuracy','位置精度（m）'],
   ['locationAt','位置取得日時'], ['cardIds','紐付け名刺ID'],
+  ['parkedAt','駐車完了日時'], ['parkingLatitude','駐車地点の緯度'], ['parkingLongitude','駐車地点の経度'],
+  ['parkingAccuracy','駐車位置精度（m）'], ['parkingLocationAt','駐車位置取得日時'], ['extraFollowUps','追加の対応予定'],
  ];
+ const legacyLabels = columns.slice(0,18).map(([, label]) => label);
  const exampleId = '記入例（取り込み対象外）';
  const pad = value => String(value).padStart(2,'0');
+ const tokyoOffset = '+09:00';
+ const tokyoClock = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Tokyo',hourCycle:'h23',
+  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
  function stage(visit) {
   if (visit.cancelled) return '中止';
@@ -37,7 +43,7 @@ const visitCsv = (() => {
   const day = stamp && (stamp[1] ? date(stamp[1]) : fallbackDate);
   const clock = stamp && time(stamp[2]);
   if (!day || !clock) return '';
-  const zone = (stamp[5] || '').toUpperCase();
+  const zone = (stamp[5] || tokyoOffset).toUpperCase();
   const parsed = new Date(day + 'T' + clock + ':' + (stamp[3] || '00') + (stamp[4] || '') + zone);
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : '';
  }
@@ -45,14 +51,35 @@ const visitCsv = (() => {
  function asLocalInput(value) {
   if (!value) return '';
   const stamp = new Date(value);
-  return localDate(stamp) + 'T' + [stamp.getHours(),stamp.getMinutes(),stamp.getSeconds()].map(pad).join(':');
+  if (!Number.isFinite(stamp.getTime())) return '';
+  const parts = Object.fromEntries(tokyoClock.formatToParts(stamp).map(part => [part.type,part.value]));
+  return [parts.year,parts.month,parts.day].join('-') + 'T' + [parts.hour,parts.minute,parts.second].join(':');
+ }
+
+ function tokyoStamp(value) {
+  const local = asLocalInput(value);
+  if (!local) return '';
+  const milliseconds = String(new Date(value).getUTCMilliseconds()).padStart(3,'0');
+  return local + '.' + milliseconds + tokyoOffset;
+ }
+
+ function followUps(visit) {
+  if (Array.isArray(visit.followUps)) return visit.followUps;
+  return visit.followUpDate || visit.followUpTask ? [{date:visit.followUpDate || '',task:visit.followUpTask || ''}] : [];
  }
 
  function rowData(visit) {
+  const [first, ...additional] = followUps(visit);
   return {
    ...visit,stage:stage(visit), latitude:visit.location?.latitude ?? '',
    longitude:visit.location?.longitude ?? '', accuracy:visit.location?.accuracy ?? '',
-   locationAt:visit.location?.timestamp || '', cardIds:JSON.stringify(visit.cardIds || []),
+   startedAt:tokyoStamp(visit.startedAt), endedAt:tokyoStamp(visit.endedAt),
+   locationAt:tokyoStamp(visit.location?.timestamp), cardIds:JSON.stringify(visit.cardIds || []),
+   parkedAt:tokyoStamp(visit.parkedAt), parkingLatitude:visit.parkingLocation?.latitude ?? '',
+   parkingLongitude:visit.parkingLocation?.longitude ?? '', parkingAccuracy:visit.parkingLocation?.accuracy ?? '',
+   parkingLocationAt:tokyoStamp(visit.parkingLocation?.timestamp),
+   followUpDate:first?.date || '', followUpTask:first?.task || '',
+   extraFollowUps:additional.length ? JSON.stringify(additional.map(({date,task}) => ({date,task}))) : '',
   };
  }
 
@@ -119,13 +146,14 @@ const visitCsv = (() => {
  function readRecord(values, rowNumber) {
   const row = Object.fromEntries(columns.map(([key], index) => [key, unescape(values[index] || '')]));
   const trimKeys = ['id','date','time','company','person','place','purpose','stage','startedAt','endedAt',
-   'followUpDate','latitude','longitude','accuracy','locationAt','cardIds'];
+   'followUpDate','latitude','longitude','accuracy','locationAt','cardIds',
+   'parkedAt','parkingLatitude','parkingLongitude','parkingAccuracy','parkingLocationAt','extraFollowUps'];
   for (const key of trimKeys) if (typeof row[key] === 'string') row[key] = row[key].trim();
   function fail(message) {throw new Error(rowNumber + '行目：' + message)}
   const visitDate = date(row.date);
   const visitTime = time(row.time);
-  if (!visitDate || !visitTime || !row.company || !row.place || !row.purpose) {
-   fail('訪問日・予定時刻・会社名・場所・内容を確認してください。');
+  if (!visitDate || !visitTime || !row.company || !row.purpose) {
+   fail('訪問日・予定時刻・会社名・内容を確認してください。');
   }
   const startedAt = timestamp(row.startedAt, visitDate);
   const endedAt = timestamp(row.endedAt, visitDate);
@@ -137,16 +165,33 @@ const visitCsv = (() => {
   const followUpDate = row.followUpDate && date(row.followUpDate);
   if (row.followUpDate && !followUpDate) fail('対応期限の日付を確認してください。');
   if (Boolean(followUpDate) !== Boolean(row.followUpTask.trim())) fail('対応期限と次にすることは一緒に入力してください。');
-  let location = null;
-  if (row.latitude || row.longitude || row.accuracy || row.locationAt) {
-   const latitude = Number(row.latitude), longitude = Number(row.longitude), accuracy = Number(row.accuracy);
-   const at = timestamp(row.locationAt,visitDate);
-   if (!row.latitude || !row.longitude || !row.accuracy || !at ||
-       !Number.isFinite(latitude) || Math.abs(latitude)>90 || !Number.isFinite(longitude) || Math.abs(longitude)>180 ||
-       !Number.isFinite(accuracy) || accuracy<0) fail('開始地点の緯度・経度・位置精度・位置取得日時を確認してください。');
-   if (row.stage === '中止' || row.stage === '予定' || (!startedAt && row.stage !== '訪問済み')) fail('予定・中止の行に開始地点は指定できません。');
-   location = {latitude,longitude,accuracy,timestamp:at};
+  const reminders = followUpDate ? [{date:followUpDate,task:row.followUpTask}] : [];
+  if (row.extraFollowUps) {
+   const error = '追加の対応予定は空欄か、出力時の書式を使用してください。';
+   let additional;
+   try {additional = JSON.parse(row.extraFollowUps)} catch {fail(error)}
+   if (!Array.isArray(additional)) fail(error);
+   for (const item of additional) {
+    if (typeof item?.date !== 'string' || !date(item.date) || typeof item.task !== 'string' || !item.task.trim()) fail(error);
+    reminders.push({date:date(item.date), task:item.task});
+   }
   }
+  function readLocation(lat, lng, precision, recordedAt, label) {
+   if (!lat && !lng && !precision && !recordedAt) return null;
+   const latitude = Number(lat), longitude = Number(lng), accuracy = Number(precision);
+   const at = timestamp(recordedAt,visitDate);
+   if (!lat || !lng || !precision || !at ||
+       !Number.isFinite(latitude) || Math.abs(latitude)>90 || !Number.isFinite(longitude) || Math.abs(longitude)>180 ||
+       !Number.isFinite(accuracy) || accuracy<0) fail(label + 'の緯度・経度・位置精度・位置取得日時を確認してください。');
+   return {latitude,longitude,accuracy,timestamp:at};
+  }
+  const location = readLocation(row.latitude,row.longitude,row.accuracy,row.locationAt,'開始地点');
+  if (location && (row.stage === '中止' || row.stage === '予定' || (!startedAt && row.stage !== '訪問済み'))) {
+   fail('予定・中止の行に開始地点は指定できません。');
+  }
+  const parkedAt = timestamp(row.parkedAt,visitDate);
+  const parkingLocation = readLocation(row.parkingLatitude,row.parkingLongitude,row.parkingAccuracy,row.parkingLocationAt,'駐車地点');
+  if ((row.parkedAt || parkingLocation) && !parkedAt) fail('駐車完了日時を確認してください。');
   let cardIds = null;
   if (row.cardIds) {
    try {cardIds = JSON.parse(row.cardIds)} catch {fail('紐付け名刺IDは空欄か、出力時の書式を使用してください。')}
@@ -154,14 +199,16 @@ const visitCsv = (() => {
    cardIds = [...new Set(cardIds)];
   }
   return {id:row.id,date:visitDate,time:visitTime,company:row.company,person:row.person,place:row.place,
-   purpose:row.purpose,startedAt,endedAt,note:row.note,followUpDate,followUpTask:row.followUpTask,
+   purpose:row.purpose,startedAt,endedAt,parkedAt,parkingLocation,note:row.note,followUps:reminders,
+   followUpDate:reminders[0]?.date || '',followUpTask:reminders[0]?.task || '',
    cancelled:row.stage === '中止',completed:row.stage === '訪問済み' || Boolean(endedAt),location,cardIds};
  }
 
  function parse(text) {
   const [header, ...data] = splitRows(text.replace(/^\uFEFF/u,''));
   const labels = columns.map(([, label]) => label);
-  if (!header || header.length !== labels.length || labels.some(label => !header.includes(label))) {
+  const expected = header?.length === legacyLabels.length ? legacyLabels : labels;
+  if (!header || header.length !== expected.length || expected.some(label => !header.includes(label))) {
    throw new Error('訪問CSVの列名を確認してください。「取り込み用ひな形を出力」から取得できます。');
   }
   const indices = labels.map(label => header.indexOf(label));
@@ -191,5 +238,5 @@ const visitCsv = (() => {
   return parse(text);
  }
 
- return {stage, date, time, timestamp, asLocalInput, encode, template, parse, read, fingerprint};
+ return {stage, date, time, timestamp, asLocalInput, followUps, encode, template, parse, read, fingerprint};
 })();

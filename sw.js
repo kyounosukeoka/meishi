@@ -2,10 +2,10 @@
 
 const scope = self.registration.scope;
 const prefix = 'meishi-techo:' + scope + ':';
-const cacheName = prefix + '1.7.0';
+const cacheName = prefix + '1.8.0';
 const entry = new URL('./index.html', scope).href;
-const assets = ['index.html', 'manifest.webmanifest', 'tie-180.png', 'storage.js?v=13', 'exports.js?v=14', 'visit-csv.js?v=16',
- 'visit-workflow.js?v=16', 'visits.js?v=16', 'screens.js?v=16', 'visit-sync.js?v=17',
+const assets = ['index.html', 'manifest.webmanifest', 'tie-180.png', 'storage.js?v=13', 'exports.js?v=14', 'visit-csv.js?v=18',
+ 'visit-workflow.js?v=16', 'visits.js?v=18', 'screens.js?v=16', 'visit-sync.js?v=17',
  'card-text.js?v=12', 'tie-192.png', 'tie-512.png', 'tie-maskable-512.png'];
 
 self.addEventListener('install', event => {

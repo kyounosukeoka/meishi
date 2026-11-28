@@ -57,6 +57,9 @@ textarea {resize:vertical}
 .visit-hero {background:#eaf0e8}
 .visit-hero h3 {font-size:1.35rem;line-height:1.35}
 .visit-hero p,.visit-summary p {margin:6px 0;white-space:pre-wrap}
+#visitLiveMemo label {margin:0 0 6px;font-weight:650}
+#visitLiveMemo textarea {display:block;min-height:clamp(19rem,48vh,36rem)}
+#visitSavedMemoText {margin:12px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .visit-primary {width:100%;min-height:54px;font-size:1.1rem;margin:8px 0 0}
 .visit-start-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .visit-start-actions button {padding-inline:5px;font-size:1rem}
@@ -104,7 +107,7 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.7.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.8.0</strong></div>
  </section>
  <details class="panel" id="visitSync">
   <summary>Supabase同期</summary>
@@ -295,6 +298,14 @@ textarea {resize:vertical}
  <button type="button" id="endVisit" class="primary visit-primary" hidden>訪問終了</button>
  <button type="button" id="resumeVisit" class="visit-primary" hidden>訪問継続</button>
  <p id="visitStatus" class="hint" role="status"></p>
+ <div id="visitLiveMemo" class="panel" hidden>
+  <label for="visitLiveMemoText">訪問中のメモ</label>
+  <textarea id="visitLiveMemoText" rows="12" placeholder="文字起こしを貼り付けるか、メモを入力"></textarea>
+ </div>
+ <details id="visitSavedMemo" class="panel" hidden>
+  <summary>訪問中のメモ</summary>
+  <p id="visitSavedMemoText"></p>
+ </details>
  <form id="visitAfterForm" hidden>
   <div class="panel">
    <h3>訪問後のメモ</h3>
@@ -688,9 +699,9 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./visit-csv.js?v=16"></script>
+<script src="./visit-csv.js?v=18"></script>
 <script src="./visit-workflow.js?v=16"></script>
-<script src="./visits.js?v=16"></script>
+<script src="./visits.js?v=18"></script>
 <script src="./screens.js?v=16"></script>
 <script src="./visit-sync.js?v=17"></script>
 </body></html>

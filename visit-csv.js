@@ -11,6 +11,7 @@ const visitCsv = (() => {
   ['parkedAt','駐車完了日時'], ['parkingLatitude','駐車地点の緯度'], ['parkingLongitude','駐車地点の経度'],
   ['parkingAccuracy','駐車位置精度（m）'], ['parkingLocationAt','駐車位置取得日時'], ['extraFollowUps','追加の対応予定'],
   ['unplanned','予定区分'], ['visitor','訪問した人'], ['intentOwner','誰の用件か'], ['result','結果・得たこと'],
+  ['inVisitNote','訪問中のメモ'],
  ];
  const exampleId = '記入例（取り込み対象外）';
  const pad = value => String(value).padStart(2,'0');
@@ -206,13 +207,14 @@ const visitCsv = (() => {
    purpose:row.purpose,startedAt,endedAt,parkedAt,parkingLocation,note:row.note,followUps:reminders,
    followUpDate:reminders[0]?.date || '',followUpTask:reminders[0]?.task || '',
    cancelled:row.stage === '中止',completed:row.stage === '訪問済み' || Boolean(endedAt),location,cardIds,
-   unplanned:row.unplanned === '予定外', visitor:row.visitor, intentOwner:row.intentOwner, result:row.result};
+   unplanned:row.unplanned === '予定外', visitor:row.visitor, intentOwner:row.intentOwner, result:row.result,
+   inVisitNote:row.inVisitNote};
  }
 
  function parse(text) {
   const [header, ...data] = splitRows(text.replace(/^\uFEFF/u,''));
   const labels = columns.map(([, label]) => label);
-  const expected = [18,24].includes(header?.length) ? labels.slice(0,header.length) : labels;
+  const expected = [18,24,28].includes(header?.length) ? labels.slice(0,header.length) : labels;
   if (!header || header.length !== expected.length || expected.some(label => !header.includes(label))) {
    throw new Error('訪問CSVの列名を確認してください。「取り込み用ひな形を出力」から取得できます。');
   }

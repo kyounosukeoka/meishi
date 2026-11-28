@@ -3,6 +3,10 @@
 const visitApp = (() => {
  const planForm = $('visitPlanForm');
  const afterForm = $('visitAfterForm');
+ const liveMemo = $('visitLiveMemoText');
+ const savedMemo = $('visitSavedMemo');
+ const savedMemoText = $('visitSavedMemoText');
+ const memoDrafts = new Map();
  const planKeys = ['date', 'time', 'company', 'person', 'place', 'purpose'];
  const visitContextKeys = ['visitor','intentOwner'];
  const afterKeys = ['note','result'];
@@ -181,8 +185,17 @@ const visitApp = (() => {
   $('endVisit').hidden = state !== '訪問中';
   $('resumeVisit').hidden = state !== '訪問済み' || !visit.startedAt;
   for (const id of ['editVisitPlan', 'deleteVisit', 'cancelVisit', 'startVisit', 'endVisit', 'resumeVisit']) $(id).disabled = busy;
+  $('visitLiveMemo').hidden = state !== '訪問中';
+  liveMemo.readOnly = busy;
+  savedMemo.hidden = state !== '訪問済み' || !visit.inVisitNote;
+  savedMemoText.textContent = savedMemo.hidden ? '' : visit.inVisitNote;
   afterForm.querySelector('[type="submit"]').disabled = busy;
   afterForm.hidden = state !== '訪問済み';
+ }
+
+ function loadMemo(visit) {
+  liveMemo.value = memoDrafts.get(visit?.id) ?? visit?.inVisitNote ?? '';
+  savedMemo.open = false;
  }
 
  function linkedNames() {
@@ -264,6 +277,7 @@ const visitApp = (() => {
   show('visitRecord');
   activeId = id;
   afterVersion = visit.version;
+  loadMemo(visit);
   fillFields(afterForm, afterKeys, visit);
   showFollowUps(visitCsv.followUps(visit));
   linkedIds = new Set(visit.cardIds);
@@ -577,6 +591,7 @@ const visitApp = (() => {
   const visit = lookup(activeId);
   if (!visit || busy || !confirm('この訪問記録を削除しますか？')) return;
   if (await runAction(() => updateVisit(visit.id, visit.version, () => null))) {
+   memoDrafts.delete(visit.id);
    for (let i=pageHistory.length-1; i>=0; i--) {
     if (pageHistory[i].visitRecord?.id === visit.id || pageHistory[i].visitPlan?.id === visit.id) pageHistory.splice(i,1);
    }
@@ -587,6 +602,10 @@ const visitApp = (() => {
  };
  $('startVisit').onclick = () => recordArrival(lookup(activeId));
  $('parkVisit').onclick = () => recordArrival(lookup(activeId), true);
+ liveMemo.oninput = () => {
+  const visit = lookup(activeId);
+  if (visit && visitStage(visit) === '訪問中') memoDrafts.set(visit.id,liveMemo.value);
+ };
  $('endVisit').onclick = async () => {
   const visit = lookup(activeId);
   if (!visit || visitStage(visit) !== '訪問中' || busy) return;
@@ -595,11 +614,14 @@ const visitApp = (() => {
    message('訪問開始日時を確認してください。開始より前の時刻で終了できません。');
    return;
   }
-  if (await runAction(() => updateVisit(visit.id, visit.version, old => ({...old, endedAt})))) {
+  const inVisitNote = liveMemo.value;
+  if (await runAction(() => updateVisit(visit.id, visit.version, old =>
+   old && visitStage(old) === '訪問中' ? {...old,endedAt,inVisitNote} : undefined))) {
+   memoDrafts.delete(visit.id);
    afterVersion = lookup(visit.id).version;
    updateRecord();
    renderCardPicker();
-   message('訪問終了を記録しました。');
+   message(inVisitNote ? '訪問終了と訪問中のメモを保存しました。' : '訪問終了を記録しました。');
   }
  };
  $('resumeVisit').onclick = async () => {
@@ -607,6 +629,7 @@ const visitApp = (() => {
   if (!visit?.startedAt || visitStage(visit) !== '訪問済み' || busy) return;
   if (await runAction(() => updateVisit(visit.id, visit.version, old => ({...old, endedAt:'', completed:false})))) {
    afterVersion = lookup(visit.id).version;
+   loadMemo(lookup(visit.id));
    message('訪問中に戻しました。');
   }
  };
@@ -759,6 +782,7 @@ const visitApp = (() => {
    const record = state.visitRecord;
    activeId = record.id;
    afterVersion = record.version;
+   loadMemo(lookup(activeId));
    fillFields(afterForm, afterKeys, record.fields);
    showFollowUps(record.followUps);
    linkedIds = new Set(record.cardIds);
@@ -777,6 +801,10 @@ const visitApp = (() => {
   locating.clear();
   locatingParking.clear();
   linkedIds.clear();
+  memoDrafts.clear();
+  liveMemo.value = '';
+  savedMemo.open = false;
+  savedMemoText.textContent = '';
   planForm.reset();
   afterForm.reset();
   customers.clear();
@@ -817,13 +845,14 @@ const visitApp = (() => {
    if (reminders !== undefined && (!Array.isArray(reminders) || reminders.some(item =>
     typeof item?.date !== 'string' || !visitCsv.date(item.date) || typeof item.task !== 'string' || !item.task.trim()))) throw new Error();
    const followUps = reminders?.map(({date,task}) => ({date,task}));
-   if ([...visitContextKeys,'result'].some(key => record[key] !== undefined && typeof record[key] !== 'string') ||
+   if ([...visitContextKeys,'result','inVisitNote'].some(key => record[key] !== undefined && typeof record[key] !== 'string') ||
        (record.unplanned !== undefined && typeof record.unplanned !== 'boolean')) throw new Error();
    return {id:record.id,version:record.version,...Object.fromEntries([...planKeys,...legacyAfterKeys].map(key=>[key,record[key]])),
     startedAt:record.startedAt,endedAt:record.endedAt,completed:record.completed === true,cancelled:record.cancelled === true,
     location:readLocation(record.location),parkedAt,parkingLocation,...(followUps && {followUps}),
     cardIds:[...new Set(record.cardIds)], unplanned:record.unplanned === true,
-    visitor:record.visitor || '',intentOwner:record.intentOwner || '',result:record.result || ''};
+    visitor:record.visitor || '',intentOwner:record.intentOwner || '',result:record.result || '',
+    ...(record.inVisitNote ? {inVisitNote:record.inVisitNote} : {})};
   });
  }
 

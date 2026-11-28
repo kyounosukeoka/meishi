@@ -3,8 +3,6 @@
 const visitSync = (() => {
  const scope = location.pathname.replace(/index\.html$/, '');
  const settingsKey = 'meishi:' + scope + ':visit-sync-settings';
- const historyKey = 'meishi:' + scope + ':visit-sync-history';
- const tableName = 'meishi_visits';
  const panel = $('visitSync');
  const status = $('visitSyncStatus');
  const conflictList = $('visitSyncConflicts');
@@ -15,9 +13,11 @@ const visitSync = (() => {
  const login = $('visitSyncLogin');
  const logout = $('visitSyncLogout');
  const synchronize = $('visitSyncNow');
+ const synchronizeCards = $('cardSyncNow');
  let connection;
  let sdk;
  let busy = false;
+ let conflictContext;
 
  function readSaved(key) {
   try {return JSON.parse(localStorage.getItem(key) || 'null')} catch {return null}
@@ -82,8 +82,10 @@ const visitSync = (() => {
   }
  }
 
- function showConflicts(conflicts) {
-  conflictList.replaceChildren(...conflicts.map(record => node('li',record.date + ' ' + record.time + ' ' + record.company)));
+ function showConflicts(conflicts, context) {
+  conflictContext = conflicts.length ? context : undefined;
+  conflictList.replaceChildren(...conflicts.map(record => node('li',
+   [record.date,record.time,record.company,record.person].filter(Boolean).join(' '))));
   conflictList.hidden = $('visitSyncResolution').hidden = !conflicts.length;
   resolution.value = '';
  }
@@ -117,15 +119,20 @@ const visitSync = (() => {
   return {pushes,pulls,conflicts,next};
  }
 
- async function signed(record) {
-  const canonical = visitApp.validateBackup([record])[0];
+ function cardFields(record) {
+  const {image,...fields} = validatedCards({format:'meishi-1',cards:[{...record,image:''}]})[0];
+  return {...fields,familyName:fields.familyName || '',givenName:fields.givenName || ''};
+ }
+
+ async function signed(record, isCard) {
+  const canonical = isCard ? cardFields(record) : visitApp.validateBackup([record])[0];
   const {version,...content} = canonical;
   const bytes = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(content)));
   const signature = Array.from(new Uint8Array(bytes),value => value.toString(16).padStart(2,'0')).join('');
   return {record:canonical,signature};
  }
 
- async function readRemote(api, owner) {
+ async function readRemote(api, owner, tableName, isCard) {
   const remote = new Map();
   const pageSize = 100;
   let cursor = '';
@@ -133,18 +140,21 @@ const visitSync = (() => {
    let request = api.from(tableName).select('id,revision,record').eq('owner_id',owner).order('id').limit(pageSize);
    if (cursor) request = request.gt('id',cursor);
    const {data,error} = await request;
+   if (isCard && (error?.code === 'PGRST205' || error?.code === '42P01')) {
+    throw new Error('Supabaseで名刺用の初期設定SQL（card-sync.sql）を実行してください。');
+   }
    if (error) throw error;
    if (!data.length) return remote;
    for (const row of data) {
-    if (row.id !== row.record?.id) throw new Error('クラウド側の訪問IDを確認してください。');
-    remote.set(row.id,{...await signed(row.record),revision:row.revision});
+    if (row.id !== row.record?.id) throw new Error('クラウド側の記録IDが一致しません。');
+    remote.set(row.id,{...await signed(row.record,isCard),revision:row.revision});
    }
    cursor = data.at(-1).id;
    if (data.length < pageSize) return remote;
   }
  }
 
- async function saveRemote(api, owner, changes) {
+ async function saveRemote(api, owner, tableName, changes) {
   const additions = changes.filter(change => !change.revision);
   for (let index = 0; index < additions.length; index += 50) {
    const rows = additions.slice(index,index+50).map(({record}) => ({owner_id:owner,id:record.id,record}));
@@ -159,26 +169,33 @@ const visitSync = (() => {
   }
  }
 
- async function sync() {
+ async function sync(isCard = false) {
+  const label = isCard ? '名刺の文字情報' : '訪問記録';
+  const kind = isCard ? 'card' : 'visit';
+  const historyKey = 'meishi:' + scope + ':' + kind + '-sync-history';
+  const tableName = isCard ? 'meishi_cards' : 'meishi_visits';
   const {api,url} = await client();
   const {data,error} = await api.auth.getUser();
   if (error || !data?.user) throw new Error('Googleでログインしてください。');
   const user = data.user;
   const syncId = url + ':' + user.id;
+  const context = kind + ':' + syncId;
   const history = readSaved(historyKey);
   if (history?.id !== syncId && !confirm((user.email || 'ログイン中のユーザー') +
-       'のSupabaseへ、この端末の訪問記録を同期しますか？')) return;
+       'のSupabaseへ、この端末の' + label + 'を同期しますか？')) return;
   const lock = appLock, key = appKey;
-  const state = await storage.read(false);
+  const state = await storage.read(isCard);
   if (state.lock?.id !== lock?.id) {
    enterLocked(state.lock);
    return;
   }
-  const records = await storage.unpack(state.visits,key,'visit');
-  const local = new Map(await Promise.all(records.map(async record => [record.id,await signed(record)])));
-  const remote = await readRemote(api,user.id);
   const baseline = new Map(history?.id === syncId ? history.records : []);
-  const choice = resolution.value;
+  const records = await storage.unpack(isCard ? state.entries : state.visits,key,kind);
+  const remote = await readRemote(api,user.id,tableName,isCard);
+  const eligible = isCard ? records.filter(record => remote.has(record.id) || baseline.has(record.id) ||
+   editorKeys.some(key => key !== 'date' && record[key]?.trim())) : records;
+  const local = new Map(await Promise.all(eligible.map(async record => [record.id,await signed(record,isCard)])));
+  const choice = conflictContext === context ? resolution.value : '';
   const pending = planMerge(local,remote,baseline);
   if (choice && pending.conflicts.length && !confirm('競合 ' + pending.conflicts.length + '件に、選んだ側の内容を反映しますか？')) {
    return;
@@ -186,17 +203,30 @@ const visitSync = (() => {
   const changes = choice ? planMerge(local,remote,baseline,choice) : pending;
   const latest = await storage.read(false);
   if (latest.revision !== state.revision) throw new Error('別の画面で端末の記録が更新されました。もう一度同期してください。');
-  await saveRemote(api,user.id,changes.pushes);
+  await saveRemote(api,user.id,tableName,changes.pushes);
   if (changes.pulls.length) {
    const found = new Map(records.map(record => [record.id,record]));
-   const packed = await Promise.all(changes.pulls.map(async record => storage.pack(
-    {...record,version:record.version === found.get(record.id)?.version ? crypto.randomUUID() : record.version},key,'visit')));
-   await storage.write(lock,(_,visits) => {for (const value of packed) visits.put(value)}, {revision:state.revision,lock});
-   await visitApp.refresh();
+   const packed = await Promise.all(changes.pulls.map(record => {
+    const previous = found.get(record.id);
+    const next = isCard ? {...previous,...record,image:previous?.image || ''} :
+     {...record,version:record.version === previous?.version ? crypto.randomUUID() : record.version};
+    return storage.pack(next,key,kind);
+   }));
+   await storage.write(lock,(cards,visits) => {
+    const store = isCard ? cards : visits;
+    for (const value of packed) store.put(value);
+   }, {revision:state.revision,lock});
+   if (isCard) {
+    const updatedIds = new Set(changes.pulls.map(record => record.id));
+    for (let index = pageHistory.length-1; index >= 0; index--) {
+     if (updatedIds.has(pageHistory[index].draft?.id)) pageHistory.splice(index,1);
+    }
+    await refresh();
+   } else await visitApp.refresh();
   }
   localStorage.setItem(historyKey,JSON.stringify({id:syncId,records:[...changes.next]}));
-  showConflicts(changes.conflicts);
-  status.textContent = '送信 ' + changes.pushes.length + '件 · 受信 ' + changes.pulls.length +
+  showConflicts(changes.conflicts,context);
+  status.textContent = label + '：送信 ' + changes.pushes.length + '件 · 受信 ' + changes.pulls.length +
    '件 · 競合を保留 ' + changes.conflicts.length + '件';
  }
 
@@ -229,12 +259,13 @@ const visitSync = (() => {
    status.textContent = 'ログアウトしました。';
   });
   synchronize.onclick = () => run(sync);
+  synchronizeCards.onclick = () => run(() => sync(true));
   if (saved && new URLSearchParams(location.search).has('code')) {
    status.textContent = 'Googleログインを確認しています。';
    client().then(async ({api}) => {
     const {data,error} = await api.auth.getSession();
     status.textContent = error || !data.session ? 'ログインを確認できませんでした。もう一度お試しください。' :
-     'ログインしました。「訪問記録を同期」を押してください。';
+     'ログインしました。同期する項目のボタンを押してください。';
    }).catch(error => {status.textContent = error.message});
   }
  }

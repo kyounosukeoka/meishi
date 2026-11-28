@@ -104,11 +104,11 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.6.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.7.0</strong></div>
  </section>
  <details class="panel" id="visitSync">
-  <summary>Supabaseで訪問記録を同期</summary>
-  <p class="hint">PCとスマホに同じプロジェクトを設定し、同じアカウントでログインしてください。訪問記録を送受信します。端末での削除や名刺は同期されません。</p>
+  <summary>Supabase同期</summary>
+  <p class="hint">PCとスマホに同じプロジェクトを設定し、同じGoogleアカウントでログインしてください。名刺は文字情報を同期します。写真と端末での削除は各端末にのみ反映されます。</p>
   <form id="visitSyncForm">
    <label>プロジェクトURL<input id="visitSyncUrl" type="url" placeholder="https://xxxx.supabase.co" required></label>
    <label>公開用キー<input id="visitSyncKey" placeholder="sb_publishable_…" autocomplete="off" required></label>
@@ -117,6 +117,7 @@ textarea {resize:vertical}
   <div class="buttons">
    <button id="visitSyncLogin" type="button">Googleでログイン</button>
    <button id="visitSyncNow" type="button" class="primary">訪問記録を同期</button>
+   <button id="cardSyncNow" type="button" class="primary">名刺を同期</button>
    <button id="visitSyncLogout" type="button">ログアウト</button>
   </div>
   <label id="visitSyncResolution" hidden>両方で変更した記録の扱い
@@ -691,5 +692,5 @@ if('serviceWorker' in navigator && window.isSecureContext){
 <script src="./visit-workflow.js?v=16"></script>
 <script src="./visits.js?v=16"></script>
 <script src="./screens.js?v=16"></script>
-<script src="./visit-sync.js?v=16"></script>
+<script src="./visit-sync.js?v=17"></script>
 </body></html>

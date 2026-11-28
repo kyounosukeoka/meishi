@@ -43,6 +43,7 @@ const visitWorkflow = (() => {
    ];
    if (visit.intentOwner) lines.splice(2,0,'誰の用件か：' + visit.intentOwner);
    if (visit.person) lines.push('面談先：' + visit.person);
+   if (visit.checkedItems?.length) lines.push('チェック項目：' + visit.checkedItems.join('、'));
    if (visit.note) lines.push('補足：' + visit.note);
    for (const item of visitCsv.followUps(visit)) lines.push('次の対応：' + item.date + ' ' + item.task);
    return lines.join('\n');

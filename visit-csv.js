@@ -12,6 +12,7 @@ const visitCsv = (() => {
   ['parkingAccuracy','駐車位置精度（m）'], ['parkingLocationAt','駐車位置取得日時'], ['extraFollowUps','追加の対応予定'],
   ['unplanned','予定区分'], ['visitor','訪問した人'], ['intentOwner','誰の用件か'], ['result','結果・得たこと'],
   ['inVisitNote','訪問中のメモ'],
+  ['checkedItems','訪問後のチェック項目'],
  ];
  const exampleId = '記入例（取り込み対象外）';
  const pad = value => String(value).padStart(2,'0');
@@ -69,6 +70,13 @@ const visitCsv = (() => {
   return visit.followUpDate || visit.followUpTask ? [{date:visit.followUpDate || '',task:visit.followUpTask || ''}] : [];
  }
 
+ function checklist(values) {
+  if (!Array.isArray(values) || values.some(value => typeof value !== 'string' || !value.trim())) {
+   throw new Error('チェック項目の形式が正しくありません。');
+  }
+  return [...new Set(values.map(value => value.trim()))];
+ }
+
  function rowData(visit) {
   const [first, ...additional] = followUps(visit);
   return {
@@ -83,6 +91,7 @@ const visitCsv = (() => {
    extraFollowUps:additional.length ? JSON.stringify(additional.map(({date,task}) => ({date,task}))) : '',
    unplanned:visit.unplanned ? '予定外' : '予定', visitor:visit.visitor || '',
    intentOwner:visit.intentOwner || '', result:visit.result || '',
+   checkedItems:visit.checkedItems?.length ? JSON.stringify(visit.checkedItems) : '',
   };
  }
 
@@ -203,18 +212,24 @@ const visitCsv = (() => {
    if (!Array.isArray(cardIds) || !cardIds.every(id => typeof id === 'string' && id)) fail('紐付け名刺IDの形式が正しくありません。');
    cardIds = [...new Set(cardIds)];
   }
+  let checkedItems = [];
+  if (row.checkedItems.trim()) {
+   const text = row.checkedItems.trim();
+   try {checkedItems = checklist(JSON.parse(text))}
+   catch {fail('訪問後のチェック項目は空欄か、出力時の書式を使用してください。')}
+  }
   return {id:row.id,date:visitDate,time:visitTime,company:row.company,person:row.person,place:row.place,
    purpose:row.purpose,startedAt,endedAt,parkedAt,parkingLocation,note:row.note,followUps:reminders,
    followUpDate:reminders[0]?.date || '',followUpTask:reminders[0]?.task || '',
    cancelled:row.stage === '中止',completed:row.stage === '訪問済み' || Boolean(endedAt),location,cardIds,
    unplanned:row.unplanned === '予定外', visitor:row.visitor, intentOwner:row.intentOwner, result:row.result,
-   inVisitNote:row.inVisitNote};
+   inVisitNote:row.inVisitNote,checkedItems};
  }
 
  function parse(text) {
   const [header, ...data] = splitRows(text.replace(/^\uFEFF/u,''));
   const labels = columns.map(([, label]) => label);
-  const expected = [18,24,28].includes(header?.length) ? labels.slice(0,header.length) : labels;
+  const expected = [18,24,28,29].includes(header?.length) ? labels.slice(0,header.length) : labels;
   if (!header || header.length !== expected.length || expected.some(label => !header.includes(label))) {
    throw new Error('訪問CSVの列名を確認してください。「取り込み用ひな形を出力」から取得できます。');
   }
@@ -247,5 +262,5 @@ const visitCsv = (() => {
 
  async function read(file) {return parse(await readText(file))}
 
- return {stage, date, time, timestamp, asLocalInput, followUps, encode, template, parse, read, fingerprint, readText, splitRows};
+ return {stage, date, time, timestamp, asLocalInput, followUps, checklist, encode, template, parse, read, fingerprint, readText, splitRows};
 })();

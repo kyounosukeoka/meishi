@@ -75,6 +75,13 @@ textarea {resize:vertical}
 .visit-card-choices {display:grid;gap:6px;max-height:240px;overflow-y:auto}
 .visit-card-choices label {margin:0;display:flex;gap:8px;align-items:center;padding:6px}
 .visit-card-choices input {width:1.1rem;flex:none}
+.visit-check-options {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:4px 12px}
+.visit-check-options label {display:flex;align-items:center;gap:10px;min-height:44px;margin:0;padding:6px 0}
+.visit-check-options input {width:1.15rem;height:1.15rem;flex:none}
+.visit-check-options small {display:block}
+#visitCheckSettingsList {list-style:none;margin:10px 0;padding:0}
+#visitCheckSettingsList li {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #e1e5dc}
+#visitCheckSettingsList button {min-height:44px;flex:none}
 .customer-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:0 12px}
 .customer-table {width:100%;border-collapse:collapse;table-layout:fixed}
 .customer-table th,.customer-table td {text-align:left;vertical-align:top;padding:8px 4px;border-bottom:1px solid #e1e5dc}
@@ -107,8 +114,18 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.8.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.9.0</strong></div>
  </section>
+ <details class="panel" id="visitCheckSettings">
+  <summary>訪問後のチェック項目</summary>
+  <p class="hint">この端末の入力欄に表示する項目です。削除しても、過去の訪問記録に保存したチェックは残ります。</p>
+  <ul id="visitCheckSettingsList"></ul>
+  <form id="visitCheckAdd">
+   <label>チェック項目名<input id="visitCheckName" type="text" required></label>
+   <button type="submit" class="primary">項目を追加</button>
+  </form>
+  <p id="visitCheckSettingsStatus" class="hint" role="status"></p>
+ </details>
  <details class="panel" id="visitSync">
   <summary>Supabase同期</summary>
   <p class="hint">PCとスマホに同じプロジェクトを設定し、同じGoogleアカウントでログインしてください。名刺は文字情報を同期します。写真と端末での削除は各端末にのみ反映されます。</p>
@@ -309,6 +326,10 @@ textarea {resize:vertical}
  <form id="visitAfterForm" hidden>
   <div class="panel">
    <h3>訪問後のメモ</h3>
+   <fieldset id="visitCheckFieldset" hidden>
+    <legend>チェック項目</legend>
+    <div class="visit-check-options" id="visitCheckOptions"></div>
+   </fieldset>
    <label>結果・得たこと<textarea name="result" rows="3" placeholder="例：再現条件を確認した／ご不在で確認できなかった"></textarea></label>
    <label>補足メモ（任意）<textarea name="note" rows="3"></textarea></label>
    <div id="visitFollowUps"></div>
@@ -699,9 +720,9 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./visit-csv.js?v=18"></script>
-<script src="./visit-workflow.js?v=16"></script>
-<script src="./visits.js?v=18"></script>
+<script src="./visit-csv.js?v=19"></script>
+<script src="./visit-workflow.js?v=19"></script>
+<script src="./visits.js?v=19"></script>
 <script src="./screens.js?v=16"></script>
 <script src="./visit-sync.js?v=17"></script>
 </body></html>

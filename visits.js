@@ -7,6 +7,12 @@ const visitApp = (() => {
  const savedMemo = $('visitSavedMemo');
  const savedMemoText = $('visitSavedMemoText');
  const memoDrafts = new Map();
+ const defaultChecks = ['担当者不在','使用度聞き取り','カウンター用紙回収','見積書お渡し'];
+ const checksKey = 'meishi:' + location.pathname.replace(/index\.html$/,'') + ':visit-checklist';
+ const checkOptions = $('visitCheckOptions');
+ const checkSettingsList = $('visitCheckSettingsList');
+ const checkName = $('visitCheckName');
+ const checkStatus = $('visitCheckSettingsStatus');
  const planKeys = ['date', 'time', 'company', 'person', 'place', 'purpose'];
  const visitContextKeys = ['visitor','intentOwner'];
  const afterKeys = ['note','result'];
@@ -189,6 +195,7 @@ const visitApp = (() => {
   liveMemo.readOnly = busy;
   savedMemo.hidden = state !== '訪問済み' || !visit.inVisitNote;
   savedMemoText.textContent = savedMemo.hidden ? '' : visit.inVisitNote;
+  $('visitCheckFieldset').disabled = busy;
   afterForm.querySelector('[type="submit"]').disabled = busy;
   afterForm.hidden = state !== '訪問済み';
  }
@@ -196,6 +203,84 @@ const visitApp = (() => {
  function loadMemo(visit) {
   liveMemo.value = memoDrafts.get(visit?.id) ?? visit?.inVisitNote ?? '';
   savedMemo.open = false;
+ }
+
+ function configuredChecks() {
+  try {
+   const saved = localStorage.getItem(checksKey);
+   return saved === null ? defaultChecks : visitCsv.checklist(JSON.parse(saved));
+  } catch {
+   return defaultChecks;
+  }
+ }
+
+ function renderCheckSettings() {
+  const items = configuredChecks();
+  checkSettingsList.replaceChildren();
+  if (!items.length) checkSettingsList.append(node('li','登録されている項目はありません。'));
+  for (const item of items) {
+   const row = node('li','');
+   const remove = node('button','削除');
+   remove.type = 'button';
+   remove.setAttribute('aria-label',item + 'を削除');
+   remove.onclick = () => saveCheckSettings(configuredChecks().filter(value => value !== item),'削除しました。');
+   row.append(node('span',item),remove);
+   checkSettingsList.append(row);
+  }
+ }
+
+ function saveCheckSettings(items, message) {
+  try {
+   localStorage.setItem(checksKey,JSON.stringify(items));
+  } catch {
+   checkStatus.textContent = 'チェック項目を保存できませんでした。';
+   return false;
+  }
+  renderCheckSettings();
+  checkStatus.textContent = message;
+  return true;
+ }
+
+ $('visitCheckAdd').onsubmit = event => {
+  event.preventDefault();
+  const name = checkName.value.trim();
+  if (!name) {
+   checkStatus.textContent = 'チェック項目名を入力してください。';
+   return;
+  }
+  const items = configuredChecks();
+  if (items.some(item => fold(item) === fold(name))) {
+   checkStatus.textContent = '同じチェック項目がすでにあります。';
+   return;
+  }
+  if (saveCheckSettings([...items,name],'追加しました。')) checkName.value = '';
+ };
+
+ function renderVisitChecks(selected = []) {
+  const current = new Set(configuredChecks());
+  const choices = new Set([...current,...selected]);
+  const checked = new Set(selected);
+  checkOptions.replaceChildren();
+  $('visitCheckFieldset').hidden = !choices.size;
+  for (const item of choices) {
+   const label = node('label','');
+   const input = document.createElement('input');
+   input.type = 'checkbox';
+   input.value = item;
+   input.checked = checked.has(item);
+   const text = node('span',item);
+   if (!current.has(item)) {
+    const previous = node('small','この端末の設定外');
+    previous.className = 'hint';
+    text.append(previous);
+   }
+   label.append(input,text);
+   checkOptions.append(label);
+  }
+ }
+
+ function readVisitChecks() {
+  return Array.from(checkOptions.querySelectorAll('input:checked'),input => input.value);
  }
 
  function linkedNames() {
@@ -279,6 +364,7 @@ const visitApp = (() => {
   afterVersion = visit.version;
   loadMemo(visit);
   fillFields(afterForm, afterKeys, visit);
+  renderVisitChecks(visit.checkedItems);
   showFollowUps(visitCsv.followUps(visit));
   linkedIds = new Set(visit.cardIds);
   $('visitCardSearch').value = '';
@@ -648,9 +734,12 @@ const visitApp = (() => {
   const followUpDate = followUps[0]?.date || '';
   const followUpTask = followUps[0]?.task || '';
   const cardIds = [...linkedIds];
+  const checkedItems = readVisitChecks();
   if (await runAction(() => updateVisit(visit.id, afterVersion, old =>
-   ({...old, ...values, followUps, followUpDate, followUpTask, cardIds})))) {
-   afterVersion = lookup(visit.id).version;
+   ({...old, ...values, followUps, followUpDate, followUpTask, cardIds,checkedItems})))) {
+   const saved = lookup(visit.id);
+   afterVersion = saved.version;
+   renderVisitChecks(saved.checkedItems);
    message('訪問後の内容を保存しました。');
   }
  };
@@ -756,6 +845,7 @@ const visitApp = (() => {
    day ||= today();
    tick();
   }
+  if (screen === 'settings') renderCheckSettings();
  }
 
  function snapshot(state) {
@@ -764,7 +854,7 @@ const visitApp = (() => {
     alreadyDone:$('visitAlreadyDone').checked,fields: readFields(planForm, [...planKeys,...visitContextKeys,...actualKeys])};
   } else if (state.screen === 'visitRecord') {
    state.visitRecord = {id: activeId, version: afterVersion, fields: readFields(afterForm, afterKeys), followUps: readFollowUps(),
-    cardIds: [...linkedIds], picker: $('visitCardPicker').open, query: $('visitCardSearch').value};
+    checkedItems:readVisitChecks(), cardIds: [...linkedIds], picker: $('visitCardPicker').open, query: $('visitCardSearch').value};
   }
  }
 
@@ -784,6 +874,7 @@ const visitApp = (() => {
    afterVersion = record.version;
    loadMemo(lookup(activeId));
    fillFields(afterForm, afterKeys, record.fields);
+   renderVisitChecks(record.checkedItems);
    showFollowUps(record.followUps);
    linkedIds = new Set(record.cardIds);
    $('visitCardSearch').value = record.query;
@@ -807,6 +898,9 @@ const visitApp = (() => {
   savedMemoText.textContent = '';
   planForm.reset();
   afterForm.reset();
+  checkOptions.replaceChildren();
+  checkName.value = '';
+  checkStatus.textContent = '';
   customers.clear();
   reportText.value = '';
   $('visitReport').open = false;
@@ -845,6 +939,7 @@ const visitApp = (() => {
    if (reminders !== undefined && (!Array.isArray(reminders) || reminders.some(item =>
     typeof item?.date !== 'string' || !visitCsv.date(item.date) || typeof item.task !== 'string' || !item.task.trim()))) throw new Error();
    const followUps = reminders?.map(({date,task}) => ({date,task}));
+   const checkedItems = record.checkedItems === undefined ? [] : visitCsv.checklist(record.checkedItems);
    if ([...visitContextKeys,'result','inVisitNote'].some(key => record[key] !== undefined && typeof record[key] !== 'string') ||
        (record.unplanned !== undefined && typeof record.unplanned !== 'boolean')) throw new Error();
    return {id:record.id,version:record.version,...Object.fromEntries([...planKeys,...legacyAfterKeys].map(key=>[key,record[key]])),
@@ -852,7 +947,7 @@ const visitApp = (() => {
     location:readLocation(record.location),parkedAt,parkingLocation,...(followUps && {followUps}),
     cardIds:[...new Set(record.cardIds)], unplanned:record.unplanned === true,
     visitor:record.visitor || '',intentOwner:record.intentOwner || '',result:record.result || '',
-    ...(record.inVisitNote ? {inVisitNote:record.inVisitNote} : {})};
+    ...(record.inVisitNote ? {inVisitNote:record.inVisitNote} : {}), ...(checkedItems.length ? {checkedItems} : {})};
   });
  }
 

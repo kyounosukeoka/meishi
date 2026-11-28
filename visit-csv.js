@@ -10,8 +10,8 @@ const visitCsv = (() => {
   ['locationAt','位置取得日時'], ['cardIds','紐付け名刺ID'],
   ['parkedAt','駐車完了日時'], ['parkingLatitude','駐車地点の緯度'], ['parkingLongitude','駐車地点の経度'],
   ['parkingAccuracy','駐車位置精度（m）'], ['parkingLocationAt','駐車位置取得日時'], ['extraFollowUps','追加の対応予定'],
+  ['unplanned','予定区分'], ['visitor','訪問した人'], ['intentOwner','誰の用件か'], ['result','結果・得たこと'],
  ];
- const legacyLabels = columns.slice(0,18).map(([, label]) => label);
  const exampleId = '記入例（取り込み対象外）';
  const pad = value => String(value).padStart(2,'0');
  const tokyoOffset = '+09:00';
@@ -80,6 +80,8 @@ const visitCsv = (() => {
    parkingLocationAt:tokyoStamp(visit.parkingLocation?.timestamp),
    followUpDate:first?.date || '', followUpTask:first?.task || '',
    extraFollowUps:additional.length ? JSON.stringify(additional.map(({date,task}) => ({date,task}))) : '',
+   unplanned:visit.unplanned ? '予定外' : '予定', visitor:visit.visitor || '',
+   intentOwner:visit.intentOwner || '', result:visit.result || '',
   };
  }
 
@@ -147,14 +149,16 @@ const visitCsv = (() => {
   const row = Object.fromEntries(columns.map(([key], index) => [key, unescape(values[index] || '')]));
   const trimKeys = ['id','date','time','company','person','place','purpose','stage','startedAt','endedAt',
    'followUpDate','latitude','longitude','accuracy','locationAt','cardIds',
-   'parkedAt','parkingLatitude','parkingLongitude','parkingAccuracy','parkingLocationAt','extraFollowUps'];
+   'parkedAt','parkingLatitude','parkingLongitude','parkingAccuracy','parkingLocationAt','extraFollowUps',
+   'unplanned','visitor','intentOwner'];
   for (const key of trimKeys) if (typeof row[key] === 'string') row[key] = row[key].trim();
   function fail(message) {throw new Error(rowNumber + '行目：' + message)}
   const visitDate = date(row.date);
   const visitTime = time(row.time);
-  if (!visitDate || !visitTime || !row.company || !row.purpose) {
-   fail('訪問日・予定時刻・会社名・内容を確認してください。');
+  if (!visitDate || !visitTime || !row.company) {
+   fail('訪問日・予定時刻・会社名を確認してください。');
   }
+  if (!['','予定','予定外'].includes(row.unplanned)) fail('予定区分は「予定」か「予定外」を入力してください。');
   const startedAt = timestamp(row.startedAt, visitDate);
   const endedAt = timestamp(row.endedAt, visitDate);
   if ((row.startedAt && !startedAt) || (row.endedAt && !endedAt) ||
@@ -201,13 +205,14 @@ const visitCsv = (() => {
   return {id:row.id,date:visitDate,time:visitTime,company:row.company,person:row.person,place:row.place,
    purpose:row.purpose,startedAt,endedAt,parkedAt,parkingLocation,note:row.note,followUps:reminders,
    followUpDate:reminders[0]?.date || '',followUpTask:reminders[0]?.task || '',
-   cancelled:row.stage === '中止',completed:row.stage === '訪問済み' || Boolean(endedAt),location,cardIds};
+   cancelled:row.stage === '中止',completed:row.stage === '訪問済み' || Boolean(endedAt),location,cardIds,
+   unplanned:row.unplanned === '予定外', visitor:row.visitor, intentOwner:row.intentOwner, result:row.result};
  }
 
  function parse(text) {
   const [header, ...data] = splitRows(text.replace(/^\uFEFF/u,''));
   const labels = columns.map(([, label]) => label);
-  const expected = header?.length === legacyLabels.length ? legacyLabels : labels;
+  const expected = [18,24].includes(header?.length) ? labels.slice(0,header.length) : labels;
   if (!header || header.length !== expected.length || expected.some(label => !header.includes(label))) {
    throw new Error('訪問CSVの列名を確認してください。「取り込み用ひな形を出力」から取得できます。');
   }
@@ -230,13 +235,15 @@ const visitCsv = (() => {
   return JSON.stringify(columns.slice(1).map(([key]) => data[key] ?? ''));
  }
 
- async function read(file) {
+ async function readText(file) {
   const bytes = await file.arrayBuffer();
   let text;
   try {text = new TextDecoder('utf-8',{fatal:true}).decode(bytes)}
   catch {text = new TextDecoder('shift_jis',{fatal:true}).decode(bytes)}
-  return parse(text);
+  return text.replace(/^\uFEFF/u,'');
  }
 
- return {stage, date, time, timestamp, asLocalInput, followUps, encode, template, parse, read, fingerprint};
+ async function read(file) {return parse(await readText(file))}
+
+ return {stage, date, time, timestamp, asLocalInput, followUps, encode, template, parse, read, fingerprint, readText, splitRows};
 })();

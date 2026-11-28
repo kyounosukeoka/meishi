@@ -63,6 +63,7 @@ function enterLocked(lock) {
  rows = [];
  draft = null;
  visitApp.clear();
+ if (typeof visitSync !== 'undefined') visitSync.clear();
  form.reset();
  $('preview').removeAttribute('src');
  $('actions').replaceChildren();

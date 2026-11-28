@@ -4,8 +4,9 @@ const visitApp = (() => {
  const planForm = $('visitPlanForm');
  const afterForm = $('visitAfterForm');
  const planKeys = ['date', 'time', 'company', 'person', 'place', 'purpose'];
- const afterKeys = ['note'];
- const legacyAfterKeys = [...afterKeys, 'followUpDate', 'followUpTask'];
+ const visitContextKeys = ['visitor','intentOwner'];
+ const afterKeys = ['note','result'];
+ const legacyAfterKeys = ['note', 'followUpDate', 'followUpTask'];
  const followUpContainer = $('visitFollowUps');
  const actualKeys = ['startedAt', 'endedAt'];
  const dateFormat = /^\d{4}-\d{2}-\d{2}$/u;
@@ -17,6 +18,7 @@ const visitApp = (() => {
  let activeId = '';
  let planId = '';
  let planVersion = '';
+ let planUnplanned = false;
  let afterVersion = '';
  let linkedIds = new Set();
  let busy = false;
@@ -36,6 +38,8 @@ const visitApp = (() => {
  const visitStage = visitCsv.stage;
  const fold = value => String(value || '').normalize('NFKC').toLowerCase().replace(/\s+/gu, '');
  const showSchedule = visit => visit.date + ' ' + visit.time;
+ const reportText = $('visitReportText');
+ const customers = visitWorkflow.customerImport(scheduleCustomers);
 
  function focusVisit(dayVisits, now) {
   const inProgress = dayVisits.find(visit => visitStage(visit) === '訪問中');
@@ -83,10 +87,19 @@ const visitApp = (() => {
   const list = $('visitList');
   list.replaceChildren();
   if (!daily.length) list.append(node('p', day === today() ? '今日の訪問予定はありません。' : 'この日の訪問予定はありません。'));
-  if (daily.length) list.append(visitList(daily));
+  const planned = daily.filter(visit => !visit.unplanned);
+  const unplanned = daily.filter(visit => visit.unplanned);
+  if (planned.length) list.append(visitList(planned));
+  if (unplanned.length) list.append(node('h3','予定外の訪問'),visitList(unplanned));
   if (openVisits.length) {
    list.append(node('h3', 'ほかの日の訪問中の記録'), visitList(openVisits, true));
   }
+  const report = visitWorkflow.report(day,daily);
+  reportText.value = report.text;
+  $('copyVisitReport').disabled = !report.text;
+  $('visitReportStatus').textContent = report.count ?
+   '訪問済み ' + report.count + '件（予定外 ' + report.unplanned + '件） · 記録に未入力あり ' + report.incomplete + '件' :
+   'この日の訪問済みの記録はまだありません。';
  }
 
  function visitList(entries, includeDate = false) {
@@ -133,10 +146,12 @@ const visitApp = (() => {
   const statusLabel = visitStage(visit);
   $('visitRecordTitle').textContent = statusLabel === '訪問済み' ? '訪問後の記録' :
    statusLabel === '中止' ? '中止した訪問予定' : statusLabel === '予定' ? '訪問予定' : '訪問中';
-  summary.append(node('p', '予定　' + showSchedule(visit)), node('h3', visit.company));
+  summary.append(node('p', (visit.unplanned ? '予定外　' : '予定　') + showSchedule(visit)), node('h3', visit.company));
   if (visit.person) summary.append(node('p', '担当者　' + visit.person));
+  if (visit.visitor) summary.append(node('p', '訪問した人　' + visit.visitor));
+  if (visit.intentOwner) summary.append(node('p', '誰の用件か　' + visit.intentOwner));
   if (visit.place) summary.append(node('p', '訪問場所　' + visit.place));
-  summary.append(node('p', '訪問内容　' + visit.purpose));
+  summary.append(node('p', '訪問目的・用件　' + (visit.purpose || '未入力')));
   if (visit.parkedAt) summary.append(parkingSummary(visit));
   if (visit.startedAt) summary.append(node('p', '開始　' + displayTime.format(new Date(visit.startedAt))));
   if (visit.endedAt) summary.append(node('p', '終了　' + displayTime.format(new Date(visit.endedAt))));
@@ -259,13 +274,18 @@ const visitApp = (() => {
   message('');
  }
 
- function openPlan(visit) {
+ function openPlan(visit, unplanned = false) {
   if (busy) return;
   show('visitPlan');
   planId = visit?.id || '';
   planVersion = visit?.version || '';
+  planUnplanned = visit?.unplanned === true || unplanned;
+  $('visitAlreadyDone').checked = false;
   drawPlanControls(visit);
-  fillFields(planForm, planKeys, visit || {date: day});
+  fillFields(planForm, [...planKeys,...visitContextKeys], visit || {
+   date:unplanned ? today() : day,
+   time:unplanned ? visitCsv.asLocalInput(new Date()).slice(11,16) : '',
+  });
   fillFields(planForm, actualKeys, {
    startedAt: visitCsv.asLocalInput(visit?.startedAt),
    endedAt: visitCsv.asLocalInput(visit?.endedAt),
@@ -276,10 +296,15 @@ const visitApp = (() => {
  function drawPlanControls(visit) {
   const state = visit && visitStage(visit);
   const hasActuals = state === '訪問中' || state === '訪問済み';
-  $('visitPlanTitle').textContent = hasActuals ? '訪問記録を編集' : visit ? '訪問予定を編集' : '訪問予定を登録';
-  $('saveVisitPlan').textContent = hasActuals ? '変更を保存' : '予定を保存';
-  $('visitActualFields').hidden = !hasActuals;
-  $('visitEndField').hidden = state !== '訪問済み';
+  const alreadyDone = !visit && planUnplanned && $('visitAlreadyDone').checked;
+  $('visitPlanTitle').textContent = planUnplanned ? (visit ? '予定外の訪問を編集' : '予定外の訪問を登録') :
+   hasActuals ? '訪問記録を編集' : visit ? '訪問予定を編集' : '訪問予定を登録';
+  $('saveVisitPlan').textContent = hasActuals ? '変更を保存' : planUnplanned ? '訪問を登録' : '予定を保存';
+  $('visitAlreadyDoneLabel').hidden = Boolean(visit) || !planUnplanned;
+  $('visitPlanTime').hidden = alreadyDone;
+  planForm.elements.namedItem('time').disabled = alreadyDone;
+  $('visitActualFields').hidden = !hasActuals && !alreadyDone;
+  $('visitEndField').hidden = state !== '訪問済み' && !alreadyDone;
  }
 
  async function refresh() {
@@ -342,6 +367,7 @@ const visitApp = (() => {
   updateNavigation();
   planForm.querySelector('[type="submit"]').disabled = busy;
   $('addVisit').disabled = busy;
+  $('addUnplanned').disabled = busy;
   $('visitCsvForm').querySelector('[type="submit"]').disabled = busy;
   if (currentScreen === 'visits') renderHub();
   if (currentScreen === 'visitRecord') updateRecord();
@@ -429,18 +455,32 @@ const visitApp = (() => {
   renderHub();
  };
  $('addVisit').onclick = () => openPlan();
+ $('addUnplanned').onclick = () => openPlan(null,true);
+ $('visitAlreadyDone').onchange = () => drawPlanControls(lookup(planId));
+ $('copyVisitReport').onclick = async () => {
+  if (!reportText.value) return;
+  try {
+   await navigator.clipboard.writeText(reportText.value);
+   message('日報の下書きをコピーしました。');
+  } catch {
+   reportText.focus();
+   reportText.select();
+   message('選択した下書きをコピーしてください。');
+  }
+ };
 
  planForm.onsubmit = async event => {
   event.preventDefault();
-  const values = readFields(planForm, planKeys);
-  if (!dateFormat.test(values.date) || !timeFormat.test(values.time) || !values.company || !values.purpose) {
-   message('訪問日、予定時刻、会社名、訪問内容を入力してください。');
+  const values = readFields(planForm, [...planKeys,...visitContextKeys]);
+  const existing = lookup(planId);
+  const alreadyDone = !existing && planUnplanned && $('visitAlreadyDone').checked;
+  if (!visitCsv.date(values.date) || (!alreadyDone && !timeFormat.test(values.time)) || !values.company) {
+   message('訪問日、時刻、会社名を入力してください。');
    return;
   }
   const id = planId || crypto.randomUUID();
-  const existing = lookup(planId);
   const state = existing && visitStage(existing);
-  const hasActuals = state === '訪問中' || state === '訪問済み';
+  const hasActuals = state === '訪問中' || state === '訪問済み' || alreadyDone;
   if (hasActuals) {
    const actual = readFields(planForm, actualKeys);
    for (const key of actualKeys) {
@@ -449,18 +489,26 @@ const visitApp = (() => {
      message('実績の日時を確認してください。');
      return;
     }
-    const matchesOriginal = stamp && Math.floor(Date.parse(stamp)/1000) === Math.floor(Date.parse(existing[key])/1000);
+    const matchesOriginal = stamp && Math.floor(Date.parse(stamp)/1000) === Math.floor(Date.parse(existing?.[key])/1000);
     values[key] = matchesOriginal ? existing[key] : stamp;
    }
-   if ((state === '訪問中' && !values.startedAt) ||
+   if (((state === '訪問中' || alreadyDone) && !values.startedAt) ||
        (values.endedAt && (!values.startedAt || values.endedAt < values.startedAt))) {
     message('開始日時と終了日時を確認してください。');
     return;
    }
-   values.completed = state === '訪問済み';
+   values.completed = state === '訪問済み' || alreadyDone;
+  }
+  if (alreadyDone) {
+   const startedDay = visitCsv.asLocalInput(values.startedAt);
+   if (startedDay.slice(0,10) !== values.date) {
+    message('訪問日と訪問開始日時の日付を揃えてください。');
+    return;
+   }
+   values.time = startedDay.slice(11,16);
   }
   const saved = await runAction(() => updateVisit(id, planVersion, old => {
-   const base = old || {startedAt:'', endedAt:'', location:null, note:'', followUpDate:'', followUpTask:'', cardIds:[]};
+   const base = old || {...newVisit(),unplanned:planUnplanned};
    return {...base, ...values};
   }));
   if (saved) {
@@ -470,9 +518,47 @@ const visitApp = (() => {
     afterVersion = lookup(id).version;
     updateRecord();
    }
+   if (!existing && lookup(id)?.unplanned && (alreadyDone || values.date === today())) openRecord(id);
    message(hasActuals ? '訪問記録を保存しました。' : '訪問予定を保存しました。');
   }
  };
+
+ function newVisit() {
+  return {startedAt:'',endedAt:'',location:null,note:'',result:'',followUpDate:'',followUpTask:'',cardIds:[]};
+ }
+
+ function scheduleCustomers(selected) {
+  const date = day || today();
+  const visitKey = visit => JSON.stringify([visit.date,visit.time,...[visit.company,visit.person,visit.place].map(fold)]);
+  return runAction(() => enqueueWrite(async () => {
+   const currentSession = session;
+   const lock = appLock;
+   const key = appKey;
+   const state = await storage.read(false);
+   if (currentSession !== session || lock?.id !== appLock?.id) return false;
+   if (state.lock?.id !== lock?.id) {
+    enterLocked(state.lock);
+    return false;
+   }
+   const existing = await storage.unpack(state.visits,key,'visit');
+   const keys = new Set(existing.filter(visit => !visit.cancelled).map(visitKey));
+   const packed = [];
+   for (const item of selected) {
+    const candidate = {...newVisit(),...item,date,intentOwner:''};
+    const signature = visitKey(candidate);
+    if (keys.has(signature)) continue;
+    keys.add(signature);
+    const record = {...candidate,id:crypto.randomUUID(),version:crypto.randomUUID()};
+    packed.push(await storage.pack(record,key,'visit'));
+   }
+   if (currentSession !== session || lock?.id !== appLock?.id) return false;
+   if (packed.length) {
+    await storage.write(lock,(_,store) => {for (const value of packed) store.add(value)}, {revision:state.revision,lock});
+    await refresh();
+   }
+   return {added:packed.length,skipped:selected.length-packed.length};
+  }));
+ }
 
  $('editVisitPlan').onclick = () => {
   const visit = lookup(activeId);
@@ -651,7 +737,8 @@ const visitApp = (() => {
 
  function snapshot(state) {
   if (state.screen === 'visitPlan') {
-   state.visitPlan = {id: planId, version: planVersion, fields: readFields(planForm, [...planKeys,...actualKeys])};
+   state.visitPlan = {id: planId, version: planVersion, unplanned:planUnplanned,
+    alreadyDone:$('visitAlreadyDone').checked,fields: readFields(planForm, [...planKeys,...visitContextKeys,...actualKeys])};
   } else if (state.screen === 'visitRecord') {
    state.visitRecord = {id: activeId, version: afterVersion, fields: readFields(afterForm, afterKeys), followUps: readFollowUps(),
     cardIds: [...linkedIds], picker: $('visitCardPicker').open, query: $('visitCardSearch').value};
@@ -663,7 +750,9 @@ const visitApp = (() => {
    const plan = state.visitPlan;
    planId = plan.id;
    planVersion = plan.version;
-   fillFields(planForm, [...planKeys,...actualKeys], plan.fields);
+   planUnplanned = plan.unplanned;
+   $('visitAlreadyDone').checked = plan.alreadyDone;
+   fillFields(planForm, [...planKeys,...visitContextKeys,...actualKeys], plan.fields);
    drawPlanControls(lookup(planId));
   }
   if (state.visitRecord) {
@@ -690,6 +779,9 @@ const visitApp = (() => {
   linkedIds.clear();
   planForm.reset();
   afterForm.reset();
+  customers.clear();
+  reportText.value = '';
+  $('visitReport').open = false;
   followUpContainer.replaceChildren();
   $('visitCsvForm').reset();
   $('visitCsvPanel').open = false;
@@ -725,12 +817,15 @@ const visitApp = (() => {
    if (reminders !== undefined && (!Array.isArray(reminders) || reminders.some(item =>
     typeof item?.date !== 'string' || !visitCsv.date(item.date) || typeof item.task !== 'string' || !item.task.trim()))) throw new Error();
    const followUps = reminders?.map(({date,task}) => ({date,task}));
+   if ([...visitContextKeys,'result'].some(key => record[key] !== undefined && typeof record[key] !== 'string') ||
+       (record.unplanned !== undefined && typeof record.unplanned !== 'boolean')) throw new Error();
    return {id:record.id,version:record.version,...Object.fromEntries([...planKeys,...legacyAfterKeys].map(key=>[key,record[key]])),
     startedAt:record.startedAt,endedAt:record.endedAt,completed:record.completed === true,cancelled:record.cancelled === true,
     location:readLocation(record.location),parkedAt,parkingLocation,...(followUps && {followUps}),
-    cardIds:[...new Set(record.cardIds)]};
+    cardIds:[...new Set(record.cardIds)], unplanned:record.unplanned === true,
+    visitor:record.visitor || '',intentOwner:record.intentOwner || '',result:record.result || ''};
   });
  }
 
- return {render, snapshot, restoreScreen, validateBackup, clear, isBusy:()=>busy};
+ return {render, snapshot, restoreScreen, validateBackup, refresh, clear, isBusy:()=>busy};
 })();

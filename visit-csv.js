@@ -13,6 +13,7 @@ const visitCsv = (() => {
   ['unplanned','予定区分'], ['visitor','訪問した人'], ['intentOwner','誰の用件か'], ['result','結果・得たこと'],
   ['inVisitNote','訪問中のメモ'],
   ['checkedItems','訪問後のチェック項目'],
+  ['destinationLatitude','訪問先の緯度'], ['destinationLongitude','訪問先の経度'],
  ];
  const exampleId = '記入例（取り込み対象外）';
  const pad = value => String(value).padStart(2,'0');
@@ -77,6 +78,11 @@ const visitCsv = (() => {
   return [...new Set(values.map(value => value.trim()))];
  }
 
+ function coordinates(latitude, longitude) {
+  return Number.isFinite(latitude) && Math.abs(latitude) <= 90 &&
+   Number.isFinite(longitude) && Math.abs(longitude) <= 180 ? {latitude,longitude} : null;
+ }
+
  function rowData(visit) {
   const [first, ...additional] = followUps(visit);
   return {
@@ -92,6 +98,7 @@ const visitCsv = (() => {
    unplanned:visit.unplanned ? '予定外' : '予定', visitor:visit.visitor || '',
    intentOwner:visit.intentOwner || '', result:visit.result || '',
    checkedItems:visit.checkedItems?.length ? JSON.stringify(visit.checkedItems) : '',
+   destinationLatitude:visit.destination?.latitude ?? '',destinationLongitude:visit.destination?.longitude ?? '',
   };
  }
 
@@ -160,7 +167,7 @@ const visitCsv = (() => {
   const trimKeys = ['id','date','time','company','person','place','purpose','stage','startedAt','endedAt',
    'followUpDate','latitude','longitude','accuracy','locationAt','cardIds',
    'parkedAt','parkingLatitude','parkingLongitude','parkingAccuracy','parkingLocationAt','extraFollowUps',
-   'unplanned','visitor','intentOwner'];
+   'unplanned','visitor','intentOwner','destinationLatitude','destinationLongitude'];
   for (const key of trimKeys) if (typeof row[key] === 'string') row[key] = row[key].trim();
   function fail(message) {throw new Error(rowNumber + '行目：' + message)}
   const visitDate = date(row.date);
@@ -206,6 +213,14 @@ const visitCsv = (() => {
   const parkedAt = timestamp(row.parkedAt,visitDate);
   const parkingLocation = readLocation(row.parkingLatitude,row.parkingLongitude,row.parkingAccuracy,row.parkingLocationAt,'駐車地点');
   if ((row.parkedAt || parkingLocation) && !parkedAt) fail('駐車完了日時を確認してください。');
+  let destination = null;
+  if (row.destinationLatitude || row.destinationLongitude) {
+   const decimal = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/iu;
+   destination = coordinates(Number(row.destinationLatitude),Number(row.destinationLongitude));
+   if (!destination || !decimal.test(row.destinationLatitude) || !decimal.test(row.destinationLongitude)) {
+    fail('訪問先の緯度と経度を両方確認してください。');
+   }
+  }
   let cardIds = null;
   if (row.cardIds) {
    try {cardIds = JSON.parse(row.cardIds)} catch {fail('紐付け名刺IDは空欄か、出力時の書式を使用してください。')}
@@ -223,13 +238,13 @@ const visitCsv = (() => {
    followUpDate:reminders[0]?.date || '',followUpTask:reminders[0]?.task || '',
    cancelled:row.stage === '中止',completed:row.stage === '訪問済み' || Boolean(endedAt),location,cardIds,
    unplanned:row.unplanned === '予定外', visitor:row.visitor, intentOwner:row.intentOwner, result:row.result,
-   inVisitNote:row.inVisitNote,checkedItems};
+   inVisitNote:row.inVisitNote,checkedItems,...(destination ? {destination} : {})};
  }
 
  function parse(text) {
   const [header, ...data] = splitRows(text.replace(/^\uFEFF/u,''));
   const labels = columns.map(([, label]) => label);
-  const expected = [18,24,28,29].includes(header?.length) ? labels.slice(0,header.length) : labels;
+  const expected = [18,24,28,29,30].includes(header?.length) ? labels.slice(0,header.length) : labels;
   if (!header || header.length !== expected.length || expected.some(label => !header.includes(label))) {
    throw new Error('訪問CSVの列名を確認してください。「取り込み用ひな形を出力」から取得できます。');
   }
@@ -262,5 +277,5 @@ const visitCsv = (() => {
 
  async function read(file) {return parse(await readText(file))}
 
- return {stage, date, time, timestamp, asLocalInput, followUps, checklist, encode, template, parse, read, fingerprint, readText, splitRows};
+ return {stage, date, time, timestamp, asLocalInput, followUps, checklist, coordinates, encode, template, parse, read, fingerprint, readText, splitRows};
 })();

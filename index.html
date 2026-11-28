@@ -75,6 +75,32 @@ textarea {resize:vertical}
 .visit-card-choices {display:grid;gap:6px;max-height:240px;overflow-y:auto}
 .visit-card-choices label {margin:0;display:flex;gap:8px;align-items:center;padding:6px}
 .visit-card-choices input {width:1.1rem;flex:none}
+.visit-radar-actions {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.visit-radar-actions button {min-height:44px;padding-inline:5px}
+.radar-controls {display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.radar-controls label {flex:1 1 10rem;margin:0}
+.radar-controls button {min-height:44px}
+.radar-plot {position:relative;aspect-ratio:1;width:100%;max-width:410px;margin:12px auto;color:#31574b;background:#e8efe8;border:1px solid #b9c7b8;border-radius:12px;font-size:.85rem}
+.radar-ring,.radar-axis,.radar-center,.radar-direction {position:absolute;pointer-events:none}
+.radar-ring {inset:10%;border:1px solid #8ca28e;border-radius:50%}
+.radar-ring--inner {inset:30%}
+.radar-axis--vertical {inset:10% auto;left:50%;border-left:1px dashed #8ca28e}
+.radar-axis--horizontal {inset:auto 10%;top:50%;border-top:1px dashed #8ca28e}
+.radar-center {top:50%;left:50%;width:10px;height:10px;transform:translate(-50%,-50%);color:#31574b;background:currentColor}
+.radar-direction--north {top:1%;left:50%;transform:translateX(-50%)}
+.radar-direction--south {bottom:1%;left:50%;transform:translateX(-50%)}
+.radar-direction--west {top:50%;left:2%;transform:translateY(-50%)}
+.radar-direction--east {top:50%;right:2%;transform:translateY(-50%)}
+.radar-point {position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;padding:0;display:grid;place-items:center;border:none;background:transparent}
+.radar-point:focus-visible {z-index:1;outline:2px solid #31574b}
+.radar-dot {display:inline-block;width:.95em;height:.95em;border:1.5px solid #27372e;border-radius:50%;background:#27372e}
+.radar-dot--done {background:#fff}
+.radar-legend {display:flex;gap:8px 14px;flex-wrap:wrap;font-size:.85rem}
+.radar-legend span {display:inline-flex;gap:5px;align-items:center}
+.radar-legend .radar-center-symbol {width:.75em;height:.75em;display:inline-block;background:#31574b}
+#radarDestinations {margin-top:12px}
+#radarDestinations button {display:flex;align-items:center;gap:8px}
+#radarDestinations .radar-dot {flex:none}
 .visit-check-options {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:4px 12px}
 .visit-check-options label {display:flex;align-items:center;gap:10px;min-height:44px;margin:0;padding:6px 0}
 .visit-check-options input {width:1.15rem;height:1.15rem;flex:none}
@@ -114,8 +140,19 @@ textarea {resize:vertical}
 <section id="settings" hidden>
  <h2>設定</h2>
  <section class="panel" aria-labelledby="versionLabel">
-  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">1.9.0</strong></div>
+  <div class="bar"><h3 id="versionLabel">アプリのバージョン</h3><strong id="appVersion">2.0.0</strong></div>
  </section>
+ <details class="panel" id="radarSettings">
+  <summary>レーダーの本社位置</summary>
+  <form id="radarHeadquartersForm">
+   <label>本社の緯度・経度<input type="text" id="radarHeadquarters" placeholder="例：43.0618, 141.3545" autocomplete="off"></label>
+   <div class="buttons">
+    <button type="button" id="radarUseHeadquartersPosition">現在地を入力</button>
+    <button type="submit" class="primary">本社位置を保存</button>
+   </div>
+  </form>
+  <p class="hint" id="radarHeadquartersStatus" role="status"></p>
+ </details>
  <details class="panel" id="visitCheckSettings">
   <summary>訪問後のチェック項目</summary>
   <p class="hint">この端末の入力欄に表示する項目です。削除しても、過去の訪問記録に保存したチェックは残ります。</p>
@@ -229,7 +266,35 @@ textarea {resize:vertical}
   <label>表示する日<input type="date" id="visitDay"></label>
   <button type="button" id="todayVisits">今日</button>
  </div>
- <div class="buttons"><button type="button" id="addUnplanned">＋ 予定外の訪問</button></div>
+ <div class="visit-radar-actions">
+  <button type="button" id="addUnplanned">＋ 予定外の訪問</button>
+  <button type="button" id="showRadar" aria-controls="visitRadar" aria-expanded="false">レーダー</button>
+ </div>
+ <section class="panel" id="visitRadar" hidden aria-labelledby="visitRadarTitle">
+  <h3 id="visitRadarTitle">今日の訪問レーダー</h3>
+  <div class="radar-controls">
+   <label>基点<select id="radarBasis">
+    <option value="headquarters">本社</option>
+    <option value="current">現在地</option>
+   </select></label>
+   <button type="button" id="radarLocate" hidden>現在地を更新</button>
+  </div>
+  <p class="hint" id="radarOriginStatus" role="status"></p>
+  <div class="radar-plot" id="radarPlot" role="group" aria-label="訪問先の位置関係（北が上）" hidden>
+   <i class="radar-axis radar-axis--horizontal"></i><i class="radar-axis radar-axis--vertical"></i>
+   <i class="radar-ring"></i><i class="radar-ring radar-ring--inner"></i><i class="radar-center"></i>
+   <span class="radar-direction radar-direction--north">北</span><span class="radar-direction radar-direction--east">東</span>
+   <span class="radar-direction radar-direction--south">南</span><span class="radar-direction radar-direction--west">西</span>
+   <div id="radarMarkers"></div>
+  </div>
+  <div class="radar-legend">
+   <span><i class="radar-dot" aria-hidden="true"></i>予定・訪問中</span>
+   <span><i class="radar-dot radar-dot--done" aria-hidden="true"></i>訪問済み</span>
+   <span><i class="radar-center-symbol" aria-hidden="true"></i>基点</span>
+  </div>
+  <p class="hint" id="radarScale" hidden></p>
+  <ul class="visit-list" id="radarDestinations"></ul>
+ </section>
  <div id="visitList"></div>
  <details class="panel" id="customerImport">
   <summary>顧客CSVから予定を作る</summary>
@@ -287,6 +352,13 @@ textarea {resize:vertical}
   <label>訪問会社名<input type="text" name="company" required></label>
   <label>担当者名（任意）<input type="text" name="person"></label>
   <label>訪問場所（任意）<input type="text" name="place" placeholder="住所・支店名など"></label>
+  <details id="visitDestinationSettings">
+   <summary>レーダー用の訪問先位置（任意）</summary>
+   <p class="hint">地図で確認した緯度・経度を入力してください。座標を含むGoogleマップのリンクも使えます。</p>
+   <label>訪問先の座標<input type="text" name="destinationInput" id="visitDestinationInput" placeholder="例：43.0618, 141.3545" autocomplete="off"></label>
+   <a id="visitDestinationMap" target="_blank" rel="noopener" hidden>Googleマップで訪問先を探す</a>
+   <button type="button" id="useDestinationPosition">現在地を入力</button>
+  </details>
   <label>訪問した人（任意）<input name="visitor" placeholder="例：先輩の氏名、自分の氏名"></label>
   <label>誰の用件か（任意）<input name="intentOwner" placeholder="例：先方の総務担当者、当社の営業担当"></label>
   <label>訪問目的・用件<textarea name="purpose" rows="3" placeholder="例：用紙詰まりの状況を確認する"></textarea></label>
@@ -720,9 +792,10 @@ if('serviceWorker' in navigator && window.isSecureContext){
 }
 </script>
 <script src="./card-text.js?v=12"></script>
-<script src="./visit-csv.js?v=19"></script>
+<script src="./visit-csv.js?v=20"></script>
 <script src="./visit-workflow.js?v=19"></script>
-<script src="./visits.js?v=19"></script>
+<script src="./visit-radar.js?v=20"></script>
+<script src="./visits.js?v=20"></script>
 <script src="./screens.js?v=16"></script>
 <script src="./visit-sync.js?v=17"></script>
 </body></html>

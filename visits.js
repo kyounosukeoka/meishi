@@ -13,6 +13,8 @@ const visitApp = (() => {
  const checkSettingsList = $('visitCheckSettingsList');
  const checkName = $('visitCheckName');
  const checkStatus = $('visitCheckSettingsStatus');
+ const destinationInput = $('visitDestinationInput');
+ const destinationSettings = $('visitDestinationSettings');
  const planKeys = ['date', 'time', 'company', 'person', 'place', 'purpose'];
  const visitContextKeys = ['visitor','intentOwner'];
  const afterKeys = ['note','result'];
@@ -50,6 +52,10 @@ const visitApp = (() => {
  const showSchedule = visit => visit.date + ' ' + visit.time;
  const reportText = $('visitReportText');
  const customers = visitWorkflow.customerImport(scheduleCustomers);
+ const radar = visitRadar.create({
+  todayVisits:() => visits.filter(visit => visit.date === today()),
+  openVisit:openRecord,redraw:renderHub,locate:currentLocation,active:screen => currentScreen === screen,
+ });
 
  function focusVisit(dayVisits, now) {
   const inProgress = dayVisits.find(visit => visitStage(visit) === '訪問中');
@@ -72,7 +78,7 @@ const visitApp = (() => {
   hero.hidden = !featured;
   if (featured) {
    const status = featured.startedAt ? '訪問中' : scheduledAt(featured) <= now ? '訪問予定時刻になりました' : '次の訪問';
-   hero.append(node('p', status + ' · ' + featured.time), node('h3', featured.company),
+   hero.append(node('p', status + ' · ' + featured.time), node('h3', radar.companyName(featured)),
     node('p', [featured.place, featured.person].filter(Boolean).join(' · ')), node('p', featured.purpose));
    const button = node('button', featured.startedAt ? '訪問記録を開く' : '訪問開始');
    button.type = 'button';
@@ -110,6 +116,7 @@ const visitApp = (() => {
   $('visitReportStatus').textContent = report.count ?
    '訪問済み ' + report.count + '件（予定外 ' + report.unplanned + '件） · 記録に未入力あり ' + report.incomplete + '件' :
    'この日の訪問済みの記録はまだありません。';
+  radar.draw();
  }
 
  function visitList(entries, includeDate = false) {
@@ -121,7 +128,7 @@ const visitApp = (() => {
    button.type = 'button';
    button.disabled = busy;
    const nextDeadline = visitCsv.followUps(visit).map(item => item.date).filter(Boolean).sort()[0];
-   button.append(node('strong', (includeDate ? showSchedule(visit) : visit.time) + '　' + visit.company),
+   button.append(node('strong', (includeDate ? showSchedule(visit) : visit.time) + '　' + radar.companyName(visit)),
     node('small', visitStage(visit) + (visitStage(visit) === '訪問済み' && nextDeadline ? ' · 対応期限 ' + nextDeadline : '')));
    if (visit.purpose) button.append(node('small', visit.purpose));
    button.onclick = () => openRecord(visit.id);
@@ -156,7 +163,7 @@ const visitApp = (() => {
   const statusLabel = visitStage(visit);
   $('visitRecordTitle').textContent = statusLabel === '訪問済み' ? '訪問後の記録' :
    statusLabel === '中止' ? '中止した訪問予定' : statusLabel === '予定' ? '訪問予定' : '訪問中';
-  summary.append(node('p', (visit.unplanned ? '予定外　' : '予定　') + showSchedule(visit)), node('h3', visit.company));
+  summary.append(node('p', (visit.unplanned ? '予定外　' : '予定　') + showSchedule(visit)), node('h3', radar.companyName(visit)));
   if (visit.person) summary.append(node('p', '担当者　' + visit.person));
   if (visit.visitor) summary.append(node('p', '訪問した人　' + visit.visitor));
   if (visit.intentOwner) summary.append(node('p', '誰の用件か　' + visit.intentOwner));
@@ -390,7 +397,18 @@ const visitApp = (() => {
    startedAt: visitCsv.asLocalInput(visit?.startedAt),
    endedAt: visitCsv.asLocalInput(visit?.endedAt),
   });
+  destinationInput.value = visitRadar.pointText(visit?.destination);
+  destinationSettings.open = Boolean(visit?.destination);
+  updateDestinationMapLink();
   message('');
+ }
+
+ function updateDestinationMapLink() {
+  const {company,place} = readFields(planForm,['company','place']);
+  const query = [company,place].filter(Boolean).join(' ');
+  const link = $('visitDestinationMap');
+  link.hidden = !query;
+  if (query) link.href = mapSearch + encodeURIComponent(query);
  }
 
  function drawPlanControls(visit) {
@@ -468,6 +486,8 @@ const visitApp = (() => {
   planForm.querySelector('[type="submit"]').disabled = busy;
   $('addVisit').disabled = busy;
   $('addUnplanned').disabled = busy;
+  $('showRadar').disabled = busy;
+  $('useDestinationPosition').disabled = busy;
   $('visitCsvForm').querySelector('[type="submit"]').disabled = busy;
   if (currentScreen === 'visits') renderHub();
   if (currentScreen === 'visitRecord') updateRecord();
@@ -556,6 +576,13 @@ const visitApp = (() => {
  };
  $('addVisit').onclick = () => openPlan();
  $('addUnplanned').onclick = () => openPlan(null,true);
+ for (const key of ['company','place']) planForm.elements.namedItem(key).oninput = updateDestinationMapLink;
+ $('useDestinationPosition').onclick = () => runAction(async () => {
+  const point = await currentLocation();
+  if (currentScreen !== 'visitPlan') return;
+  if (point) destinationInput.value = visitRadar.pointText(visitCsv.coordinates(point.latitude,point.longitude));
+  else message('現在地を取得できませんでした。訪問先の座標を入力してください。');
+ });
  $('visitAlreadyDone').onchange = () => drawPlanControls(lookup(planId));
  $('copyVisitReport').onclick = async () => {
   if (!reportText.value) return;
@@ -576,6 +603,13 @@ const visitApp = (() => {
   const alreadyDone = !existing && planUnplanned && $('visitAlreadyDone').checked;
   if (!visitCsv.date(values.date) || (!alreadyDone && !timeFormat.test(values.time)) || !values.company) {
    message('訪問日、時刻、会社名を入力してください。');
+   return;
+  }
+  const coordinates = destinationInput.value.trim();
+  values.destination = visitRadar.parsePoint(coordinates);
+  if (coordinates && !values.destination) {
+   destinationSettings.open = true;
+   message('訪問先の緯度・経度を確認してください。');
    return;
   }
   const id = planId || crypto.randomUUID();
@@ -845,13 +879,17 @@ const visitApp = (() => {
    day ||= today();
    tick();
   }
-  if (screen === 'settings') renderCheckSettings();
+  if (screen === 'settings') {
+   renderCheckSettings();
+   radar.renderSettings();
+  }
  }
 
  function snapshot(state) {
   if (state.screen === 'visitPlan') {
    state.visitPlan = {id: planId, version: planVersion, unplanned:planUnplanned,
-    alreadyDone:$('visitAlreadyDone').checked,fields: readFields(planForm, [...planKeys,...visitContextKeys,...actualKeys])};
+    alreadyDone:$('visitAlreadyDone').checked,fields: readFields(planForm, [...planKeys,...visitContextKeys,...actualKeys]),
+    coordinates:destinationInput.value,destinationOpen:destinationSettings.open};
   } else if (state.screen === 'visitRecord') {
    state.visitRecord = {id: activeId, version: afterVersion, fields: readFields(afterForm, afterKeys), followUps: readFollowUps(),
     checkedItems:readVisitChecks(), cardIds: [...linkedIds], picker: $('visitCardPicker').open, query: $('visitCardSearch').value};
@@ -866,6 +904,9 @@ const visitApp = (() => {
    planUnplanned = plan.unplanned;
    $('visitAlreadyDone').checked = plan.alreadyDone;
    fillFields(planForm, [...planKeys,...visitContextKeys,...actualKeys], plan.fields);
+   destinationInput.value = plan.coordinates;
+   destinationSettings.open = plan.destinationOpen;
+   updateDestinationMapLink();
    drawPlanControls(lookup(planId));
   }
   if (state.visitRecord) {
@@ -901,6 +942,8 @@ const visitApp = (() => {
   checkOptions.replaceChildren();
   checkName.value = '';
   checkStatus.textContent = '';
+  destinationInput.value = '';
+  radar.clear();
   customers.clear();
   reportText.value = '';
   $('visitReport').open = false;
@@ -940,6 +983,8 @@ const visitApp = (() => {
     typeof item?.date !== 'string' || !visitCsv.date(item.date) || typeof item.task !== 'string' || !item.task.trim()))) throw new Error();
    const followUps = reminders?.map(({date,task}) => ({date,task}));
    const checkedItems = record.checkedItems === undefined ? [] : visitCsv.checklist(record.checkedItems);
+   const destination = visitCsv.coordinates(record.destination?.latitude,record.destination?.longitude);
+   if (record.destination != null && !destination) throw new Error();
    if ([...visitContextKeys,'result','inVisitNote'].some(key => record[key] !== undefined && typeof record[key] !== 'string') ||
        (record.unplanned !== undefined && typeof record.unplanned !== 'boolean')) throw new Error();
    return {id:record.id,version:record.version,...Object.fromEntries([...planKeys,...legacyAfterKeys].map(key=>[key,record[key]])),
@@ -947,7 +992,8 @@ const visitApp = (() => {
     location:readLocation(record.location),parkedAt,parkingLocation,...(followUps && {followUps}),
     cardIds:[...new Set(record.cardIds)], unplanned:record.unplanned === true,
     visitor:record.visitor || '',intentOwner:record.intentOwner || '',result:record.result || '',
-    ...(record.inVisitNote ? {inVisitNote:record.inVisitNote} : {}), ...(checkedItems.length ? {checkedItems} : {})};
+    ...(record.inVisitNote ? {inVisitNote:record.inVisitNote} : {}), ...(checkedItems.length ? {checkedItems} : {}),
+    ...(destination ? {destination} : {})};
   });
  }
 
